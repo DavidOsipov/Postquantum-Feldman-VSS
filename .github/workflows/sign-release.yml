@@ -2,11 +2,11 @@ name: Sign Release Artifacts
 
 on:
   release:
-    types: [published]  # Trigger only when a new release is *created*
+    types: [published]
 
 permissions:
-  contents: write  # Needed to upload release assets
-  id-token: write  # Needed for OIDC authentication with Sigstore
+  contents: write
+  id-token: write
 
 jobs:
   sign:
@@ -14,40 +14,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false  # Avoid keeping credentials around longer than needed
+          persist-credentials: false
 
-      - name: Set up Python  #  This step is CRUCIAL
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10' # Or another supported version, matching your project
+          python-version: '3.10'
 
       - name: Install dependencies (including your package in editable mode)
         run: |
           python -m pip install --upgrade pip
-          pip install -e .  # Install your package (so it's available to the signing action)
+          pip install -e .  
 
       - name: Sign Script with Sigstore
         uses: sigstore/gh-action-sigstore-python@v3.0.0
         with:
-          inputs: feldman_vss.py
-            README.md
-            LICENSE
-          # Optional: Sign other files too, e.g., a README or LICENSE
-          # inputs: |
-          #   feldman_vss.py
-          #   README.md
-          #   LICENSE
-          release-signing-artifacts: true # Upload signatures as release assets
-          upload-signing-artifacts: true # Also upload as workflow artifacts (for debugging)
-
-      # Optional: Verify the signature (good practice)
+          inputs: feldman_vss.py README.md LICENSE pyproject.toml
+          release-signing-artifacts: true
+          upload-signing-artifacts: true
       - name: Verify Signature
-        if: always()  # Run verification even if signing fails (for diagnostics)
+        if: always()
         uses: sigstore/gh-action-sigstore-python@v3.0.0
         with:
-          inputs: feldman_vss_current.py
+          inputs: feldman_vss.py README.md LICENSE pyproject.toml
           verify: true
-          #  We know the identity because it will be the GitHub Actions bot.
-          #  The format is {actor}@users.noreply.github.com
-          verify-cert-identity: ${{ github.actor }}@users.noreply.github.com
-          verify-oidc-issuer: https://token.actions.githubusercontent.com
