@@ -38,3 +38,5 @@ jobs:
         with:
           inputs: feldman_vss.py README.md LICENSE pyproject.toml
           verify: true
+          verify-cert-identity: personal@david-osipov.vision
+          verify-oidc-issuer: https://oauth2.sigstage.dev/auth
