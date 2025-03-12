@@ -2,7 +2,7 @@ name: Sign Release Artifacts
 
 on:
   release:
-    types: [created]  # Trigger only when a new release is *created*
+    types: [published]  # Trigger only when a new release is *created*
 
 permissions:
   contents: write  # Needed to upload release assets
