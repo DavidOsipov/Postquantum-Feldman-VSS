@@ -9,9 +9,11 @@
 
 This library provides a Python implementation of Feldman's Verifiable Secret Sharing (VSS) scheme, designed with **post-quantum security** in mind.  It builds upon Shamir's Secret Sharing, adding mathematical verification to ensure the integrity of distributed shares, and uses hash-based commitments to resist quantum attacks.
 
-**ATTENTION:**
+
+## ATTENTION:
 
 This code was developed with the assistance of AI language models and has been supervised by a product manager (non-cryptographer and non-developer).  **The code has not undergone a formal security audit.** While every effort has been made to implement best practices for security and performance, it is **strongly recommended not to use this code in a production environment** without a thorough independent security review by qualified cryptography experts.  Use at your own risk.
+
 
 **Key Features:**
 
