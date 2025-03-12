@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "feldman-vss-pq"
+version = "0.7.0-Alpha"
+authors = [
+  { name="David Osipov", email="personal@david-osipov.vision" },
+]
+description = "Post-Quantum Secure Feldman's Verifiable Secret Sharing (VSS) in Python"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Security :: Cryptography",
+    "Intended Audience :: Developers",
+    "Development Status :: 3 - Alpha",
+]
+dependencies = [
+  "gmpy2",
+  "msgpack",
+  "blake3; platform_system!='Emscripten'",
+  "xxhash; platform_system!='Emscripten'"
+]
+
+[project.urls]
+Homepage = "https://github.com/davidosipov/feldman-vss-pq"
+Issues = "https://github.com/davidosipov/feldman-vss-pq/issues"
+
+[tool.setuptools]
+py-modules = ["feldman_vss_"]
+
+[tool.setuptools.dynamic]
+version = {attr = "feldman_vss.VSS_VERSION"}
+
+
+[tool.pytest.ini_options]
+addopts = "-v -x --doctest-modules"
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
