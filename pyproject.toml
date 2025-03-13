@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "feldman-vss-pq"
-version = "0.7.4a0"
+version = "0.7.5b0"
 authors = [
   { name="David Osipov", email="personal@david-osipov.vision" },
 ]
@@ -17,12 +17,12 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Security :: Cryptography",
     "Intended Audience :: Developers",
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
 ]
 dependencies = [
-  "gmpy2",
-  "msgpack",
-  "blake3; platform_system!='Emscripten'"
+  "gmpy2>=2.2.1",
+  "msgpack>=1.1.0",
+  "blake3>=1.0.4; platform_system!='Emscripten'"
 ]
 
 [project.urls]
