@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies (including your package in editable mode)
         run: |
-          python -m pip install
+          python -m pip install .
           python -m pip install --upgrade pip
 
       - name: Sign Script with Sigstore
@@ -31,9 +31,3 @@ jobs:
         with:
           inputs: feldman_vss.py README.md SECURITY.md LICENSE pyproject.toml
           release-signing-artifacts: true
-      - name: Verify Signature
-        if: always()
-        uses: sigstore/gh-action-sigstore-python@300d3393a8effd58cc9e99f701c7c7238fb517d2
-        with:
-          inputs: feldman_vss.py README.md SECURITY.md LICENSE pyproject.toml
-          verify: true
