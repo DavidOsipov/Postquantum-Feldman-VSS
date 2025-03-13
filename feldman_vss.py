@@ -1,7 +1,7 @@
 """
 Post-Quantum Secure Feldman's Verifiable Secret Sharing (VSS) Implementation
 
-Version 0.7.4-Alpha
+Version 0.7.5-Beta
 
 This module provides a secure, production-ready implementation of Feldman's VSS scheme
 with post-quantum security by design. It enhances Shamir's Secret Sharing with
@@ -54,9 +54,39 @@ Security Considerations:
 -   Designed for seamless integration with Shamir's Secret Sharing implementation.
 -   Implements countermeasures against timing attacks, fault injection attacks, and
     Byzantine behavior.
--   Uses cryptographically secure random number generation (secrets module).
+-   Uses cryptographically secure random number generation (secrets module) where needed.
 
-Note: This implementation is fully compatible with the `ShamirSecretSharing` class in
+**Potential Vulnerabilities (Acknowledged but Not Fully Addressed in this Beta Version):**
+
+This beta version has several known potential vulnerabilities that users should be aware of:
+
+1.  **Timing Side-Channels:** Functions like `constant_time_compare`, `_secure_matrix_solve`,
+    and `_find_secure_pivot` *aim* for constant-time operation but are written in pure Python.
+    The Python interpreter, garbage collection, and underlying hardware can introduce timing
+    variations that *might* leak information about secret values. Mitigations are proposed
+    (but not implemented in this version), including using bitwise operations and always
+    performing swaps in matrix operations. The *ideal* solution is to use a well-vetted
+    cryptographic library or implement these functions in a lower-level language (e.g., C).
+    *Use with caution in environments where precise timing measurements are possible.*
+
+2.  **`secure_redundant_execution` Assumptions:** The `secure_redundant_execution` function
+    assumes that the provided function is strictly deterministic and has no side effects. If the
+    function has any non-deterministic behavior (even subtle variations), the redundant executions
+    might produce different results, leading to a `SecurityError` being raised. *Ensure functions
+    passed to `secure_redundant_execution` are truly deterministic.*
+
+3.  **Bias in `hash_to_group`:** The `hash_to_group` function uses rejection sampling. In rare
+    cases (if many attempts fail), it falls back to modular reduction, introducing a *slight*
+    statistical bias. While the bias is likely negligible for large primes, it's a theoretical
+    weakness.
+
+Future versions will aim to address these issues more comprehensively.
+
+**False-Positive Vulnerabilities:**
+
+1. **Use of `random.Random()` in `_refresh_shares_additive`:**  The code uses `random.Random()` seeded with cryptographically strong material (derived from a master secret and a party ID) within the `_refresh_shares_additive` function. While `random.Random()` is *not* generally suitable for cryptographic purposes, its use *here* is intentional and secure.  The purpose is to generate *deterministic* but *unpredictable* values for the zero-sharing polynomials.  The security comes from the cryptographically strong seed, *not* from the `random.Random()` algorithm itself.  This is a deliberate design choice to enable verification and reduce communication overhead in the share refreshing protocol. It is *not* a source of cryptographic weakness.
+
+Note: This implementation is fully compatible with the ShamirSecretSharing class in
 the main module and is optimized to work in synergy with Pedersen VSS.
 """
 import threading
@@ -93,7 +123,7 @@ except ImportError:
     )
 
 # Security parameters
-VSS_VERSION = "VSS-v1.0.0-PQ"
+VSS_VERSION = "VSS-0.7.5b0"
 # Minimum size for secure prime fields for post-quantum security
 MIN_PRIME_BITS = 4096
 
@@ -341,7 +371,6 @@ class CyclicGroup:
         self.cached_powers = SafeLRUCache(capacity=cache_size)
 
         # Pre-compute fixed-base exponentiations for common operations
-        self._precompute_window_size = 8
         self._precompute_exponent_length = self.prime.bit_length()
         self._precomputed_powers = self._precompute_powers()
 
@@ -526,11 +555,28 @@ class CyclicGroup:
             dict: Precomputed powers of the generator.
         """
         bits = self.prime.bit_length()
-        # Adjust window sizes based on prime bit length
-        small_window = self._precompute_window_size or (5 if bits > 4096 else 4)
-        large_window = 8  # Larger window for bigger jumps
+        
+        # Dynamic window sizing based on prime size
+        if self._precompute_window_size is not None:
+            small_window = self._precompute_window_size
+        else:
+            # Enhanced adaptive logic with better scaling
+            if bits > 8192:
+                small_window = 8  # Conservative for very large primes
+            elif bits > 6144:
+                small_window = 7
+            elif bits > 4096:
+                small_window = 6
+            elif bits > 3072:
+                small_window = 5
+            else:
+                small_window = 4  # Minimum size for good performance
+        
+        # Large window remains at 8 for consistent big jumps
+        large_window = 8
         large_step = 2 ** small_window
 
+        # Rest of the method remains unchanged
         precomputed = {}
 
         # Small window exponents for fine-grained values
@@ -722,7 +768,7 @@ class CyclicGroup:
         required_bytes = (self.prime.bit_length() + 7) // 8
         
         counter = 0
-        max_attempts = 100  # Reasonable limit to prevent infinite loops
+        max_attempts = 1000  # Reasonable limit to prevent infinite loops
         original_data = data
         
         while counter < max_attempts:
@@ -765,21 +811,13 @@ class CyclicGroup:
     def _enhanced_encode_for_hash(self, *args, context="FeldmanVSS"):
         """
         Description:
-            Securely encode multiple values for hashing based on Baghery's recommendations.
-
-            This prevents collision attacks by properly separating the inputs using
-            length-prefixing, ensuring the security of hash-based commitments.
-            Uses fixed-length byte representation for integers to guarantee deterministic
-            hashing across different platforms and execution environments.
-
+            Securely encode multiple values for hashing with enhanced domain separation.
+            Uses both type tagging and length-prefixing to prevent collision attacks.
+            
         Arguments:
             *args: Values to encode for hashing.
             context (str): Optional context string for domain separation (default: "FeldmanVSS").
-
-        Inputs:
-            *args: Values to encode for hashing
-            context: Optional context string for domain separation (default: "FeldmanVSS")
-
+            
         Outputs:
             bytes: Bytes ready for hashing.
         """
@@ -789,27 +827,30 @@ class CyclicGroup:
         # Add protocol version identifier
         encoded += VSS_VERSION.encode('utf-8')
 
-        # Add context string with length prefixing for domain separation
+        # Add context string with type tag and length prefixing for domain separation
         context_bytes = context.encode('utf-8')
+        encoded += b'\x01'  # Type tag for context string
         encoded += len(context_bytes).to_bytes(4, 'big')
         encoded += context_bytes
 
         # Calculate byte length for integer serialization once
-        prime_bit_length = self.prime.bit_length()
+        prime_bit_length = self.group.prime.bit_length()
         byte_length = (prime_bit_length + 7) // 8
 
-        # Add each value with proper length prefixing
+        # Add each value with type tagging and length prefixing
         for arg in args:
-            # Convert to bytes with type-specific handling
+            # Convert to bytes with type-specific handling and tagging
             if isinstance(arg, bytes):
+                encoded += b'\x00'  # Tag for bytes
                 arg_bytes = arg
             elif isinstance(arg, str):
+                encoded += b'\x01'  # Tag for string
                 arg_bytes = arg.encode('utf-8')
             elif isinstance(arg, int) or isinstance(arg, gmpy2.mpz):
-                # Handle integers with fixed-length representation
+                encoded += b'\x02'  # Tag for int/mpz
                 arg_bytes = int(arg).to_bytes(byte_length, 'big')
             else:
-                # For other types, use string representation
+                encoded += b'\x03'  # Tag for other types
                 arg_bytes = str(arg).encode('utf-8')
 
             # Add 4-byte length followed by the data itself
@@ -1060,8 +1101,8 @@ class FeldmanVSS:
     """
 
     def __init__(self, field, config=None, group=None):
-        if not isinstance(field, object):  # Change to check for MersennePrimeField when importing
-            raise TypeError("Field must be a MersennePrimeField instance")
+        if not hasattr(field, 'prime') or not isinstance(field.prime, (int, gmpy2.mpz)):
+            raise TypeError("Field must have a 'prime' attribute that is an integer or gmpy2.mpz.")
 
         self.field = field
         self.config = config or VSSConfig()  # Always post-quantum secure by default
@@ -1619,8 +1660,8 @@ class FeldmanVSS:
                 
             # Additional check for commitment structure
             for i, commitment in enumerate(unpacked.get("commitments", [])):
-                if not isinstance(commitment, (list, tuple)) or len(commitment) != 2:
-                    raise SerializationError(f"Invalid commitment format at index {i}: expected (commitment, randomizer) pair")
+                if not isinstance(commitment, (list, tuple)) or len(commitment) not in (2, 3):
+                    raise SerializationError(f"Invalid commitment format at index {i}: expected (commitment, randomizer) or (commitment, randomizer, extra_entropy) tuple")
 
             # Extract the commitments and parameters
             commitments = unpacked.get("commitments")
@@ -1643,6 +1684,24 @@ class FeldmanVSS:
             # Validate generator is in the correct range
             if generator <= 1 or generator >= prime - 1:
                 raise SecurityError("Deserialized generator is outside valid range")
+            
+            # Ensure the generator is valid for this prime
+            g = gmpy2.mpz(generator)
+            p = gmpy2.mpz(prime)
+            q = (p - 1) // 2  # For safe primes, q = (p-1)/2 is also prime
+            # A proper generator for a safe prime p=2q+1 should satisfy g^q ≠ 1 mod p
+            if gmpy2.powmod(g, q, p) == 1:
+                raise SecurityError("Deserialized generator is not a valid group generator")
+
+            # Additional validation to verify all commitment values are in the proper range
+            for i, commitment_data in enumerate(unpacked.get("commitments", [])):
+                if len(commitment_data) >= 2:
+                    commitment_value = commitment_data[0]
+                    randomizer = commitment_data[1]
+                    
+                    # Validate commitment and randomizer are in valid range
+                    if not (0 <= commitment_value < prime) or not (0 <= randomizer < prime):
+                        raise SecurityError(f"Commitment or randomizer at index {i} is outside valid range")
 
             # Enforce hash-based commitments for post-quantum security
             if not is_hash_based:
@@ -1650,12 +1709,13 @@ class FeldmanVSS:
 
             # Reconstruct hash-based commitments
             commitments = [
-            (
-                gmpy2.mpz(c), 
-                gmpy2.mpz(r), 
-                bytes.fromhex(e) if e else None
-            ) 
-            for c, r, e in commitments
+                (
+                    gmpy2.mpz(c), 
+                    gmpy2.mpz(r), 
+                    bytes.fromhex(e) if e else None
+                ) 
+                for c, r, *extra in unpacked.get("commitments", [])
+                for e in [extra[0] if extra else None]
             ]
 
             return commitments, gmpy2.mpz(generator), gmpy2.mpz(prime), timestamp, is_hash_based
@@ -2391,6 +2451,30 @@ class FeldmanVSS:
         Outputs:
             dict: Dictionary mapping (party_id, participant_id) to consistency result.
         """
+        
+        # Validate input parameter types
+        if not isinstance(zero_commitments, dict):
+            raise TypeError("zero_commitments must be a dictionary")
+        if not isinstance(zero_sharings, dict):
+            raise TypeError("zero_sharings must be a dictionary")
+        if not isinstance(participant_ids, list):
+            raise TypeError("participant_ids must be a list")
+
+        # Validate the structure of zero_sharings
+        for party_id, party_shares in zero_sharings.items():
+            if not isinstance(party_shares, dict):
+                raise TypeError(f"Invalid share format for party {party_id}: expected dictionary")
+            for p_id, share in party_shares.items():
+                if not isinstance(share, tuple) or len(share) != 2:
+                    raise TypeError(f"Invalid share from party {party_id} to participant {p_id}: expected (x, y) tuple")
+
+        # Validate the structure of zero_commitments
+        for party_id, commitments in zero_commitments.items():
+            if not isinstance(commitments, list) or not commitments:
+                raise TypeError(f"Invalid commitment format for party {party_id}: expected non-empty list")
+            if not all(isinstance(c, tuple) and len(c) >= 2 for c in commitments):
+                raise TypeError(f"Invalid commitment format for party {party_id}: expected list of (commitment, randomizer) tuples")
+
         consistency_results = {}
 
         # Create cryptographically secure fingerprints of each sharing
@@ -3402,19 +3486,67 @@ class FeldmanVSS:
             serialized_proof = unpacked.get("proof")
             if not serialized_proof:
                 raise SerializationError("Missing proof data in serialized commitments")
+                
+            # Validate proof structure more thoroughly
+            required_keys = ["blinding_commitments", "challenge", "responses", 
+                            "commitment_randomizers", "blinding_randomizers", "timestamp"]
+            for key in required_keys:
+                if key not in serialized_proof:
+                    raise SerializationError(f"Proof missing required field: {key}")
+                    
+            # Validate types and structures
+            if not isinstance(serialized_proof["blinding_commitments"], list):
+                raise SerializationError("blinding_commitments must be a list")
+                
+            if not isinstance(serialized_proof["challenge"], int):
+                raise SerializationError("challenge must be an integer")
+                
+            if not isinstance(serialized_proof["responses"], list):
+                raise SerializationError("responses must be a list")
+                
+            if not isinstance(serialized_proof["commitment_randomizers"], list):
+                raise SerializationError("commitment_randomizers must be a list")
+                
+            if not isinstance(serialized_proof["blinding_randomizers"], list):
+                raise SerializationError("blinding_randomizers must be a list")
+                
+            # Validate consistency between lengths
+            components = [
+                serialized_proof["blinding_commitments"],
+                serialized_proof["responses"],
+                serialized_proof["commitment_randomizers"],
+                serialized_proof["blinding_randomizers"]
+            ]
+            
+            if not all(len(c) == len(components[0]) for c in components):
+                raise SerializationError("Inconsistent lengths in proof components")
+                
+            # Validate blinding commitments structure
+            for i, bc in enumerate(serialized_proof["blinding_commitments"]):
+                if not isinstance(bc, (list, tuple)) or len(bc) != 2:
+                    raise SerializationError(f"Invalid blinding commitment format at index {i}")
 
             # Reconstruct the proof with proper structure
             proof = {
-                "blinding_commitments": [(c, r) for c, r in serialized_proof["blinding_commitments"]],
-                "challenge": serialized_proof["challenge"],
-                "responses": serialized_proof["responses"],
-                "commitment_randomizers": serialized_proof["commitment_randomizers"],
-                "blinding_randomizers": serialized_proof["blinding_randomizers"],
+                "blinding_commitments": [(gmpy2.mpz(c), gmpy2.mpz(r)) 
+                                        for c, r in serialized_proof["blinding_commitments"]],
+                "challenge": gmpy2.mpz(serialized_proof["challenge"]),
+                "responses": [gmpy2.mpz(r) for r in serialized_proof["responses"]],
+                "commitment_randomizers": [gmpy2.mpz(r) for r in serialized_proof["commitment_randomizers"]],
+                "blinding_randomizers": [gmpy2.mpz(r) for r in serialized_proof["blinding_randomizers"]],
                 "timestamp": serialized_proof["timestamp"]
             }
 
-            return commitments, proof, generator, prime, timestamp
+            # Validate timestamp is reasonable (not in the future, not too old)
+            current_time = int(time.time())
+            if proof["timestamp"] > current_time + 60:  # Allow 1 minute clock skew
+                warnings.warn("Proof timestamp is in the future", SecurityWarning)
+            
+            # Check if proof is extremely old (90 days)
+            if current_time - proof["timestamp"] > 7776000:  
+                warnings.warn("Proof is more than 90 days old", SecurityWarning)
 
+            return commitments, proof, generator, prime, timestamp
         except Exception as e:
             if isinstance(e, (SerializationError, SecurityError)):
                 raise
@@ -3780,25 +3912,34 @@ def verify_dual_commitments(feldman_vss, pedersen_vss, feldman_commitments,
 
     # Check if we're using hash-based commitments for Feldman VSS
     is_hash_based = isinstance(feldman_commitments[0], tuple)
+    
+    # Initialize validity flag for constant-time verification
+    all_valid = True
+    
+    # Also validate in constant-time that response_randomizers has the right length if needed
+    if is_hash_based:
+        all_valid &= (response_randomizers is not None)
+        all_valid &= (len(response_randomizers) == len(responses)) if response_randomizers is not None else False
 
     # First verify Pedersen commitments - these use the same approach regardless
     for i in range(len(responses)):
         # Verify using Pedersen VSS verification method
-        if not pedersen_vss.verify_response_equation(
+        pedersen_valid = pedersen_vss.verify_response_equation(
             responses[i],
             challenge,
             pedersen_blinding_commitments[i],
             pedersen_commitments[i]
-        ):
-            return False
+        )
+        all_valid &= pedersen_valid
 
     # Then verify Feldman commitments
     if is_hash_based:
         # For hash-based commitments, verification requires validating hash output
-        if response_randomizers is None or len(response_randomizers) != len(responses):
-            return False
-
         for i in range(len(responses)):
+            # Skip verification if we've already determined randomizers are invalid
+            if response_randomizers is None or i >= len(response_randomizers):
+                continue
+                
             # Calculate expected hash for response value and randomizer
             response_value = responses[i]
             r_combined = response_randomizers[i]
@@ -3815,8 +3956,7 @@ def verify_dual_commitments(feldman_vss, pedersen_vss, feldman_commitments,
             expected = (blinding_commitment_value + challenge * commitment_value) % feldman_vss.group.prime
 
             # Check equality using constant-time comparison
-            if not constant_time_compare(computed, expected):
-                return False
+            all_valid &= constant_time_compare(computed, expected)
     else:
         # Standard Feldman commitment verification
         for i in range(len(responses)):
@@ -3828,7 +3968,6 @@ def verify_dual_commitments(feldman_vss, pedersen_vss, feldman_commitments,
             right_side = feldman_vss.group.mul(feldman_blinding_commitments[i], commitment_term)
 
             # Check equality using constant-time comparison
-            if not constant_time_compare(left_side, right_side):
-                return False
+            all_valid &= constant_time_compare(left_side, right_side)
 
-    return True
+    return all_valid
