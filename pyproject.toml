@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "feldman-vss-pq"
-version = "0.7.0-Alpha"
+version = "0.7.4a0"
 authors = [
   { name="David Osipov", email="personal@david-osipov.vision" },
 ]
@@ -22,20 +22,18 @@ classifiers = [
 dependencies = [
   "gmpy2",
   "msgpack",
-  "blake3; platform_system!='Emscripten'",
-  "xxhash; platform_system!='Emscripten'"
+  "blake3; platform_system!='Emscripten'"
 ]
 
 [project.urls]
 Homepage = "https://github.com/davidosipov/feldman-vss-pq"
 Issues = "https://github.com/davidosipov/feldman-vss-pq/issues"
 
-[tool.setuptools]
-py-modules = ["feldman_vss_"]
+[tool.setuptools.packages]
+find = {}
 
 [tool.setuptools.dynamic]
 version = {attr = "feldman_vss.VSS_VERSION"}
-
 
 [tool.pytest.ini_options]
 addopts = "-v -x --doctest-modules"
