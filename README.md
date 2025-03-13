@@ -119,6 +119,31 @@ This beta version has several known potential vulnerabilities that users should 
 
 Future versions will aim to address these issues more comprehensively.
 
+## How the Script Works in Detail:
+
+For a comprehensive explanation of the internal workings of the `feldman-vss-pq` library (version 0.7.5-beta), please refer to the detailed documentation on the [How version 0.7.5-beta works in detail](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki/How-version-0.7.5%E2%80%90beta-works-in-detail) wiki page.  This document provides an in-depth breakdown of each class and method, including design choices, security considerations, and potential vulnerabilities. It covers topics such as:
+
+*   **Class Structure:**  Detailed explanation of `FeldmanVSS`, `CyclicGroup`, `VSSConfig`, and `SafeLRUCache`.
+*   **Core Methods:**  Step-by-step walkthroughs of key methods like `create_commitments`, `verify_share`, `refresh_shares`, and more.
+*   **Security Mechanisms:**  In-depth discussion of how the library addresses post-quantum security, timing attacks, fault injection attacks, and Byzantine behavior.
+*   **Helper Functions:**  Explanation of supporting functions like `constant_time_compare`, `secure_redundant_execution`, and others.
+*   **Serialization and Deserialization:** Details on how commitment data is securely serialized and deserialized.
+*   **Zero-Knowledge Proofs:** How the library generates and verifies zero-knowledge proofs.
+* **Integration with Pedersen VSS**: Dual verification for binding and hiding.
+
+## References:
+
+The following sources were used as references and inspiration for the creation of this library:
+
+*   Feldman, P. (1987). A Practical Scheme for Non-interactive Verifiable Secret Sharing. In 28th Annual Symposium on Foundations of Computer Science (FOCS), pp. 427-437. IEEE. [Link](https://dl.acm.org/doi/10.1109/SFCS.1987.46)
+*   Shamir, A. (1979). How to Share a Secret. Communications of the ACM, 22(11), 612-613. [Link](https://dl.acm.org/doi/10.1145/359168.359176)
+*   Chen, X., & Lindell, Y. (2024). Fast Actively Secure Multi-Party Computation with Dishonest Majority. [Link](https://eprint.iacr.org/2024/311)
+*   Baghery, K., Khazaei, S., & Sadeghi, A. R. (2025). A Unified Framework for Verifiable Secret Sharing. [Link](https://eprint.iacr.org/2024/1394)
+*   Gennaro, R., Ishai, Y., Kushilevitz, E., & Rabin, T. (2007). The round complexity of verifiable secret sharing and secure multicast. In Proceedings of the thirty-ninth annual ACM symposium on Theory of computing, pp. 580-589. [Link](https://dl.acm.org/doi/10.1145/1250790.1250876)
+*   Cramer, R., Damgård, I., & Nielsen, J. B. (2015). Secure Multiparty Computation and Secret Sharing. Cambridge University Press.
+*   National Institute of Standards and Technology (NIST). (2013). Recommendation for Applications Using Approved Hash Algorithms. NIST Special Publication 800-107 Revision 1.
+*   National Institute of Standards and Technology (NIST). (2020). Recommendation for Pair-Wise Key Establishment Schemes Using Discrete Logarithm Cryptography NIST Special Publication 800-56A, Revision 3.
+
 ## License:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
