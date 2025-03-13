@@ -2,9 +2,10 @@
 name: Publish Python 🐍 distributions 📦 to PyPI and TestPyPI
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+  # Allows to run this workflow manually from the Actions tab on GitHub UI
   workflow_dispatch:
 
 jobs:
@@ -34,7 +35,7 @@ jobs:
         hatch build
 
     - name: Publish distribution 📦 to PyPI
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+      if: startsWith(github.ref, 'refs/tags/v')
       uses: pypa/gh-action-pypi-publish@db8f07d3871a0a180efa06b95d467625c19d5d5f
       with:
         print-hash: true
