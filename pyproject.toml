@@ -26,8 +26,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/davidosipov/feldman-vss-pq"
-Issues = "https://github.com/davidosipov/feldman-vss-pq/issues"
+Homepage = "https://github.com/davidosipov/Postquantum-Feldman-VSS"
+Issues = "https://github.com/davidosipov/Postquantum-Feldman-VSS/issues"
 
 [tool.setuptools.packages]
 find = {}
