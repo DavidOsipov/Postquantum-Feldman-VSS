@@ -34,7 +34,6 @@ This code was developed with the assistance of AI language models and has been s
 
 *   **gmpy2:** Required for efficient and secure large-number arithmetic. (`pip install gmpy2`)
 *   **blake3:** (Highly Recommended) For fast and secure cryptographic hashing. (`pip install blake3`)
-*   **xxhash:** (Recommended) For high-performance checksums. (`pip install xxhash`)
 *   **msgpack:** For efficient and secure serialization. (`pip install msgpack`)
 
 If `blake3` is not available, the library will fall back to SHA3-256, but `blake3` is strongly recommended for performance and security. If `xxhash` is not available, a cryptographic fallback (BLAKE3 or SHA3-256) will be used for checksums.
