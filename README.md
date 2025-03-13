@@ -7,7 +7,7 @@
 [![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
-This library provides a Python implementation of Feldman's Verifiable Secret Sharing (VSS) scheme, designed with **post-quantum security** in mind.  It builds upon Shamir's Secret Sharing, adding mathematical verification to ensure the integrity of distributed shares, and uses hash-based commitments to resist quantum attacks.
+This library provides a Python implementation of Feldman's Verifiable Secret Sharing (VSS) scheme, designed with **post-quantum security** in mind. It builds upon Shamir's Secret Sharing, adding mathematical verification to ensure the integrity of distributed shares, and uses hash-based commitments to resist quantum attacks.
 
 ## ATTENTION:
 
@@ -17,28 +17,28 @@ This code was developed with the assistance of AI language models and has been s
 
 *   **Post-Quantum Security:** Employs hash-based commitments (using BLAKE3 or SHA3-256) and large prime fields (minimum 4096 bits) to provide resistance against quantum computers.  No reliance on discrete logarithm problems.
 *   **Verifiable Secret Sharing:** Allows participants to verify the correctness of their shares, ensuring that the dealer has distributed shares of a valid secret.
-*   **Fault Injection Countermeasures:** Includes redundant computation and checksum verification to mitigate fault injection attacks.
-*   **Efficient Batch Verification:** Optimized for verifying multiple shares simultaneously.
-*   **Serialization and Deserialization:** Provides secure serialization and deserialization of commitment data, including checksums for integrity checks and handling of extra entropy for low-entropy secrets.
+*   **Fault Injection Countermeasures:** Includes redundant computation (`secure_redundant_execution`) and checksum verification to mitigate fault injection attacks.
+*   **Efficient Batch Verification:** Optimized for verifying multiple shares simultaneously using `batch_verify_shares`.
+*   **Serialization and Deserialization:** Provides secure serialization and deserialization of commitment data (`serialize_commitments`, `deserialize_commitments`), including checksums for integrity checks and handling of extra entropy for low-entropy secrets.
 *   **Integration with Shamir's Secret Sharing:** Designed for seamless integration with a standard Shamir Secret Sharing implementation (specifically, it provides a helper function `create_vss_from_shamir`).
-*   **Zero-Knowledge Proofs:** Includes methods to generate and verify zero-knowledge proofs of polynomial knowledge and dual-commitment proofs (for integration with Pedersen VSS).
-*   **Byzantine Fault Tolerance:** Robust handling of malicious participants, including detection of equivocation, inconsistent shares, and adaptive quorum-based detection during share refreshing.
-*   **Share Refreshing:** Implements an optimized version of Chen & Lindell's Protocol 5 for securely refreshing shares without changing the underlying secret, with enhancements for asynchronous environments and improved Byzantine fault tolerance.
-*   **Constant-Time Operations:** Utilizes constant-time comparison and exponentiation where appropriate to mitigate timing side-channel attacks.
-*   **Optimized Cyclic Group Operations:** Features an enhanced cyclic group implementation with a thread-safe LRU caching and precomputation for improved performance.
-*   **Comprehensive Error Handling:** Includes custom exceptions for security, parameter, verification, and serialization errors.
+*   **Zero-Knowledge Proofs:** Includes methods to generate and verify zero-knowledge proofs of polynomial knowledge (`create_polynomial_proof`, `verify_polynomial_proof`) and dual-commitment proofs (for integration with Pedersen VSS: `create_dual_commitment_proof`, `verify_dual_commitments`).
+*   **Byzantine Fault Tolerance:** Robust handling of malicious participants, including detection of equivocation, inconsistent shares, and adaptive quorum-based detection during share refreshing.  This includes methods like `_detect_byzantine_behavior`, `_process_echo_consistency`, and `_enhanced_collusion_detection`.
+*   **Share Refreshing:** Implements an optimized version of Chen & Lindell's Protocol 5 (`refresh_shares`, `_refresh_shares_additive`) for securely refreshing shares without changing the underlying secret, with enhancements for asynchronous environments and improved Byzantine fault tolerance.
+*   **Constant-Time Operations:** Utilizes constant-time comparison (`constant_time_compare`) and exponentiation (`secure_exp`) where appropriate to mitigate timing side-channel attacks. *However, see "Potential Vulnerabilities" below.*
+*   **Optimized Cyclic Group Operations:** Features an enhanced `CyclicGroup` class implementation with a thread-safe LRU caching (`SafeLRUCache`) and precomputation for improved performance.
+*   **Comprehensive Error Handling:** Includes custom exceptions for security (`SecurityError`, `SecurityWarning`), parameter (`ParameterError`), verification (`VerificationError`), and serialization (`SerializationError`) errors.
 *   **gmpy2-based Arithmetic:** Leverages the `gmpy2` library for high-performance, arbitrary-precision arithmetic, critical for cryptographic operations.
-*    **Deterministic Hashing:** Uses fixed-size integer representation for commitment generation, to be platform independent.
+*   **Deterministic Hashing:** Uses fixed-size integer representation for commitment generation (`_compute_hash_commitment_single`, `_compute_hash_commitment`), to be platform independent.
 
-**Dependencies:**
+## Dependencies:
 
 *   **gmpy2:** Required for efficient and secure large-number arithmetic. (`pip install gmpy2`)
 *   **blake3:** (Highly Recommended) For fast and secure cryptographic hashing. (`pip install blake3`)
 *   **msgpack:** For efficient and secure serialization. (`pip install msgpack`)
 
-If `blake3` is not available, the library will fall back to SHA3-256, but `blake3` is strongly recommended for performance and security. If `xxhash` is not available, a cryptographic fallback (BLAKE3 or SHA3-256) will be used for checksums.
+If `blake3` is not available, the library will fall back to SHA3-256, but `blake3` is strongly recommended for performance and security.
 
-**Installation:**
+## Installation:
 
 ```bash
 pip install feldman-vss-pq
@@ -51,7 +51,7 @@ git clone https://github.com/davidosipov/feldman-vss-pq.git
 cd feldman-vss-pq
 ```
 
-**Basic Usage:**
+## Basic Usage:
 
 ```python
 from feldman_vss_pq import FeldmanVSS, get_feldman_vss, VSSConfig, CyclicGroup, create_vss_from_shamir
@@ -99,22 +99,30 @@ new_shares, new_commitments, verification_data = vss.refresh_shares(shares, 3, 5
 # ... (rest of the example similar to above)
 ```
 
-**Security Considerations:**
+## Security Considerations:
 
 *   **Prime Size:** This library defaults to 4096-bit primes for post-quantum security. It enforces a minimum of 4096 bits. Using smaller primes is *strongly discouraged* and will trigger warnings.
-*   **Safe Primes:** The library defaults to using safe primes (where `p` and `(p-1)/2` are both prime) to enhance security.  This can be configured.
-*   **Hash Algorithm:** BLAKE3 is the preferred hash algorithm for its speed and security.
+*   **Safe Primes:** The library defaults to using safe primes (where `p` and `(p-1)/2` are both prime) to enhance security.  This can be configured via the `safe_prime` parameter in `VSSConfig`.
+*   **Hash Algorithm:** BLAKE3 is the preferred hash algorithm for its speed and security.  The library falls back to SHA3-256 if BLAKE3 is not available.
 *   **Entropy:** The library uses `secrets` for cryptographically secure random number generation.
-*   **Side-Channel Attacks:** Constant-time operations are used where appropriate to mitigate timing attacks.
+*   **Side-Channel Attacks:** Constant-time operations are used where appropriate to mitigate timing attacks. *However, see "Potential Vulnerabilities" below.*
 
-**Contributing:**
+## Potential Vulnerabilities (Acknowledged but Not Fully Addressed):
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (you'll likely want to create this file).
+This beta version has several known potential vulnerabilities that users should be aware of:
 
-**License:**
+1.  **Timing Side-Channels:** Functions like `constant_time_compare`, `_secure_matrix_solve`, and `_find_secure_pivot` *aim* for constant-time operation but are written in pure Python. The Python interpreter, garbage collection, and underlying hardware can introduce timing variations that *might* leak information about secret values.  The *ideal* solution is to use a well-vetted cryptographic library or implement these functions in a lower-level language (e.g., C). *Use with caution in environments where precise timing measurements are possible.*
+
+2.  **`secure_redundant_execution` Assumptions:** The `secure_redundant_execution` function assumes that the provided function is strictly deterministic and has no side effects.  If the function has any non-deterministic behavior, the redundant executions might produce different results, leading to a `SecurityError`. *Ensure functions passed to `secure_redundant_execution` are truly deterministic.*
+
+3.  **Bias in `hash_to_group`:** The `hash_to_group` function uses rejection sampling. In rare cases, it falls back to modular reduction, introducing a *slight* statistical bias.
+
+Future versions will aim to address these issues more comprehensively.
+
+## License:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-**Author:**
+## Author:
 
 David Osipov (personal@david-osipov.vision)
