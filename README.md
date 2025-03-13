@@ -1,6 +1,6 @@
 # Post-Quantum Secure Feldman's Verifiable Secret Sharing
 
-[![Version](https://img.shields.io/badge/version-0.7.4a0-blue)](https://github.com/davidosipov/feldman-vss-pq)
+[![Version](https://img.shields.io/badge/version-0.7.5b0-blue)](https://github.com/davidosipov/feldman-vss-pq)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 ![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
 [![Tests](https://github.com/davidosipov/feldman-vss-pq/actions/workflows/tests.yml/badge.svg)](https://github.com/davidosipov/feldman-vss-pq/actions/workflows/tests.yml)
