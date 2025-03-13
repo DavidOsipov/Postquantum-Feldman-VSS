@@ -27,7 +27,7 @@ jobs:
           pip install -e .  
 
       - name: Sign Script with Sigstore
-        uses: sigstore/gh-action-sigstore-python@v3.0.0
+        uses: sigstore/gh-action-sigstore-python@f514d46b907ebcd5bedc05145c03b69c1edd8b46
         with:
           inputs: feldman_vss.py README.md LICENSE pyproject.toml
           release-signing-artifacts: true
