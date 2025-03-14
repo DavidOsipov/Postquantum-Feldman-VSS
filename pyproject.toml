@@ -48,6 +48,7 @@ Source = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS"
 "ORCID" = "https://orcid.org/0009-0005-2713-9242"
 "Telegram" = "https://telegram.me/david_osipov"
 "Signal" =  "https://signal.me/#eu/d68l1UjrWlGVRzbfkVM1bvQMNqCqiae9GM86P_af8ZK2o5E5YSNKbL4MyM9y-2WH"
+license-files = ["LICEN[CS]E*", "AUTHORS.md"]
 
 [project.optional-dependencies]
 test = [
