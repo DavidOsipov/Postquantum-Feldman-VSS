@@ -1,47 +1,136 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=69.2.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "PostQuantum-Feldman-VSS"
-version = "0.7.5b0"
+version = {attr = "feldman_vss.VSS_VERSION"}
 authors = [
-  { name="David Osipov", email="personal@david-osipov.vision" },
+  { name = "David Osipov", email = "personal@david-osipov.vision" },
+]
+maintainers = [ # Added maintainers
+  { name = "David Osipov", email = "personal@david-osipov.vision" },
 ]
 description = "Post-Quantum Secure Feldman's Verifiable Secret Sharing (VSS) in Python"
 readme = "README.md"
 requires-python = ">=3.8"
+license = {text = "MIT"}  # Correct MIT license declaration
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
     "Topic :: Security :: Cryptography",
-    "Intended Audience :: Developers",
-    "Development Status :: 4 - Beta",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-  "gmpy2>=2.2.1",
-  "msgpack>=1.1.0",
-  "blake3>=1.0.4; platform_system!='Emscripten'"
+  "gmpy2 = 2.2.1",
+  "msgpack = 1.1.0",
+  "blake3 = 1.0.4; platform_system != 'Emscripten'",
 ]
 
 [project.urls]
-Homepage = "https://github.com/davidosipov/Postquantum-Feldman-VSS"
-Issues = "https://github.com/davidosipov/Postquantum-Feldman-VSS/issues"
+Homepage = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS"
+Issues = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/issues"
+Source = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS"
+"Security Advisories" = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/security/advisories"
+"Personal Website" = "https://david-osipov.vision"
+"LinkedIn" = "https://www.linkedin.com/in/david-osipov"
+"GitHub Profile" = "https://github.com/DavidOsipov"
+"ISNI" = "https://isni.org/isni/000000051802960X"
+"ORCID" = "https://orcid.org/0009-0005-2713-9242"
+"Telegram" = "https://telegram.me/david_osipov"
+"Signal" =  "https://signal.me/#eu/d68l1UjrWlGVRzbfkVM1bvQMNqCqiae9GM86P_af8ZK2o5E5YSNKbL4MyM9y-2WH"
 
-[tool.setuptools.packages]
-find = {}
+[project.optional-dependencies]
+test = [
+    "pytest >= 7.0",
+    "pytest-cov >= 4.0",
+    "pytest-xdist >= 3.0",
+    "hypothesis >= 6.0"
+]
+docs = [
+    "sphinx >= 7.0",
+    "sphinx-rtd-theme >= 2.0",
+    "myst-parser >= 2.0",
+    "sphinx-copybutton >= 0.5",
+    "sphinx-autodoc-typehints >= 2.0",
+]
+dev = [
+    "black >= 24.0",
+    "isort >= 5.10",
+    "flake8 >= 7.0",
+    "mypy >= 1.9",
+    "pre-commit >= 3.6",
+    "types-requests",
+    "types-setuptools",
+]
 
-[tool.setuptools.dynamic]
-version = {attr = "feldman_vss.VSS_VERSION"}
+# Use py-modules instead of packages.find for a single-file module
+[tool.setuptools]
+py-modules = ["feldman_vss"]
 
 [tool.pytest.ini_options]
-addopts = "-v -x --doctest-modules"
+addopts = "-v -x --doctest-modules --cov=feldman_vss --cov-report=term-missing --cov-report=xml --cov-report=html"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+branch = true
+source = ["feldman_vss"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "except ImportError",
+    "if typing.TYPE_CHECKING:",
+]
 
 [tool.isort]
 profile = "black"
 line_length = 88
+known_first_party = ["feldman_vss"]
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+
+[tool.mypy]
+python_version = "3.8"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_optional = true
+warn_return_any = true
+show_error_codes = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+    "gmpy2.*",
+    "msgpack.*",
+    "blake3.*",
+    "pytest.*",
+    "hypothesis.*",
+    "sphinx.*",
+]
+ignore_missing_imports = true
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+per-file-ignores = ["__init__.py:F401"]
