@@ -1,6 +1,6 @@
 # Post-Quantum Secure Feldman's Verifiable Secret Sharing
 
-[![Version](https://img.shields.io/badge/version-0.7.5b0-blue)](https://github.com/davidosipov/feldman-vss-pq)
+[![Version](https://img.shields.io/badge/version-0.7.6b0-blue)](https://github.com/davidosipov/feldman-vss-pq)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 ![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
 [![Tests](https://github.com/davidosipov/feldman-vss-pq/actions/workflows/tests.yml/badge.svg)](https://github.com/davidosipov/feldman-vss-pq/actions/workflows/tests.yml)
@@ -24,7 +24,7 @@ This code was developed with the assistance of AI language models and has been s
 *   **Zero-Knowledge Proofs:** Includes methods to generate and verify zero-knowledge proofs of polynomial knowledge (`create_polynomial_proof`, `verify_polynomial_proof`) and dual-commitment proofs (for integration with Pedersen VSS: `create_dual_commitment_proof`, `verify_dual_commitments`).
 *   **Byzantine Fault Tolerance:** Robust handling of malicious participants, including detection of equivocation, inconsistent shares, and adaptive quorum-based detection during share refreshing.  This includes methods like `_detect_byzantine_behavior`, `_process_echo_consistency`, and `_enhanced_collusion_detection`.
 *   **Share Refreshing:** Implements an optimized version of Chen & Lindell's Protocol 5 (`refresh_shares`, `_refresh_shares_additive`) for securely refreshing shares without changing the underlying secret, with enhancements for asynchronous environments and improved Byzantine fault tolerance.
-*   **Constant-Time Operations:** Utilizes constant-time comparison (`constant_time_compare`) and exponentiation (`secure_exp`) where appropriate to mitigate timing side-channel attacks. *However, see "Potential Vulnerabilities" below.*
+*   **Constant-Time Operations:** Utilizes constant-time comparison (`constant_time_compare`) and exponentiation (`secure_exp`) where appropriate to mitigate timing side-channel attacks. *However, see "Known Security Vulnerabilities" below.*
 *   **Optimized Cyclic Group Operations:** Features an enhanced `CyclicGroup` class implementation with a thread-safe LRU caching (`SafeLRUCache`) and precomputation for improved performance.
 *   **Comprehensive Error Handling:** Includes custom exceptions for security (`SecurityError`, `SecurityWarning`), parameter (`ParameterError`), verification (`VerificationError`), and serialization (`SerializationError`) errors.
 *   **gmpy2-based Arithmetic:** Leverages the `gmpy2` library for high-performance, arbitrary-precision arithmetic, critical for cryptographic operations.
@@ -41,7 +41,7 @@ If `blake3` is not available, the library will fall back to SHA3-256, but `blake
 ## Installation:
 
 ```bash
-pip install feldman-vss-pq
+pip install PostQuantum-Feldman-VSS
 ```
 
 The source code is also available on Github:
@@ -105,23 +105,25 @@ new_shares, new_commitments, verification_data = vss.refresh_shares(shares, 3, 5
 *   **Safe Primes:** The library defaults to using safe primes (where `p` and `(p-1)/2` are both prime) to enhance security.  This can be configured via the `safe_prime` parameter in `VSSConfig`.
 *   **Hash Algorithm:** BLAKE3 is the preferred hash algorithm for its speed and security.  The library falls back to SHA3-256 if BLAKE3 is not available.
 *   **Entropy:** The library uses `secrets` for cryptographically secure random number generation.
-*   **Side-Channel Attacks:** Constant-time operations are used where appropriate to mitigate timing attacks. *However, see "Potential Vulnerabilities" below.*
+*   **Side-Channel Attacks:** Constant-time operations are used where appropriate to mitigate timing attacks. *However, see "Known Security Vulnerabilities" below.*
 
-## Potential Vulnerabilities (Acknowledged but Not Fully Addressed):
+## Known Security Vulnerabilities:
 
-This beta version has several known potential vulnerabilities that users should be aware of:
+This beta version (0.7.6b0) has several known security vulnerabilities that cannot be adequately addressed in pure Python:
 
-1.  **Timing Side-Channels:** Functions like `constant_time_compare`, `_secure_matrix_solve`, and `_find_secure_pivot` *aim* for constant-time operation but are written in pure Python. The Python interpreter, garbage collection, and underlying hardware can introduce timing variations that *might* leak information about secret values.  The *ideal* solution is to use a well-vetted cryptographic library or implement these functions in a lower-level language (e.g., C). *Use with caution in environments where precise timing measurements are possible.*
+1.  **Timing Side-Channels in Matrix Operations:** Functions like `_find_secure_pivot` and `_secure_matrix_solve` cannot guarantee constant-time execution in Python, potentially leaking secret information.  (See [GHSA-q65w-fg65-79f4](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/security/advisories/GHSA-q65w-fg65-79f4))
 
-2.  **`secure_redundant_execution` Assumptions:** The `secure_redundant_execution` function assumes that the provided function is strictly deterministic and has no side effects.  If the function has any non-deterministic behavior, the redundant executions might produce different results, leading to a `SecurityError`. *Ensure functions passed to `secure_redundant_execution` are truly deterministic.*
+2.  **Inadequate Fault Injection Countermeasures in `secure_redundant_execution`:**  The `secure_redundant_execution` function attempts to mitigate fault injection attacks, but several weaknesses exist due to Python's execution environment. (See [GHSA-r8gc-qc2c-c7vh](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/security/advisories/GHSA-r8gc-qc2c-c7vh))
 
-3.  **Bias in `hash_to_group`:** The `hash_to_group` function uses rejection sampling. In rare cases, it falls back to modular reduction, introducing a *slight* statistical bias.
+3. **Use of Potentially Predictable PRNG in Share Refreshing:** The `_refresh_shares_additive` function uses `random.Random()` seeded with cryptographically strong material. While `random.Random()` is *not* generally suitable for cryptographic purposes, its use *here* is intentional and secure. (See [GHSA-39v3-9v27-595x](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/security/advisories/GHSA-39v3-9v27-595x))
 
-Future versions will aim to address these issues more comprehensively.
+**Status:** These vulnerabilities require implementation in a lower-level language like Rust to fix properly. The library should be considered experimental until these issues are addressed.
+
+**Planned Resolution:** Future versions will integrate with Rust components for security-critical operations.
 
 ## How the Script Works in Detail:
 
-For a comprehensive explanation of the internal workings of the `feldman-vss-pq` library (version 0.7.5-beta), please refer to the detailed documentation on the [How version 0.7.5-beta works in detail](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki/How-version-0.7.5%E2%80%90beta-works-in-detail) wiki page.  This document provides an in-depth breakdown of each class and method, including design choices, security considerations, and potential vulnerabilities. It covers topics such as:
+For a comprehensive explanation of the internal workings of the `feldman-vss-pq` library (version 0.7.6-beta), please refer to the detailed documentation on the [How version 0.7.6-beta works in detail](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki/How-version-0.7.6%E2%80%90beta-works-in-detail) wiki page.  This document provides an in-depth breakdown of each class and method, including design choices, security considerations, and potential vulnerabilities. It covers topics such as:
 
 *   **Class Structure:**  Detailed explanation of `FeldmanVSS`, `CyclicGroup`, `VSSConfig`, and `SafeLRUCache`.
 *   **Core Methods:**  Step-by-step walkthroughs of key methods like `create_commitments`, `verify_share`, `refresh_shares`, and more.
