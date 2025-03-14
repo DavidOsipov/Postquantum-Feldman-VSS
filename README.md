@@ -123,7 +123,7 @@ This beta version (0.7.6b0) has several known security vulnerabilities that cann
 
 ## How the Script Works in Detail:
 
-For a comprehensive explanation of the internal workings of the `feldman-vss-pq` library (version 0.7.6-beta), please refer to the detailed documentation on the [How version 0.7.6-beta works in detail](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki/How-version-0.7.6%E2%80%90beta-works-in-detail) wiki page.  This document provides an in-depth breakdown of each class and method, including design choices, security considerations, and potential vulnerabilities. It covers topics such as:
+For a comprehensive explanation of the internal workings of the `PostQuantum-Feldman-VSS` library (version 0.7.6-beta), please refer to the detailed documentation on the [How version 0.7.6-beta works in detail](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki/How-version-0.7.6%E2%80%90beta-works-in-detail) wiki page.  This document provides an in-depth breakdown of each class and method, including design choices, security considerations, and potential vulnerabilities. It covers topics such as:
 
 *   **Class Structure:**  Detailed explanation of `FeldmanVSS`, `CyclicGroup`, `VSSConfig`, and `SafeLRUCache`.
 *   **Core Methods:**  Step-by-step walkthroughs of key methods like `create_commitments`, `verify_share`, `refresh_shares`, and more.
