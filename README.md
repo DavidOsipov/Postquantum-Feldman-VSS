@@ -47,8 +47,8 @@ pip install PostQuantum-Feldman-VSS
 The source code is also available on Github:
 
 ```bash
-git clone https://github.com/davidosipov/feldman-vss-pq.git
-cd feldman-vss-pq
+git clone https://github.com/davidosipov/PostQuantum-Feldman-VSSq.git
+cd PostQuantum-Feldman-VSS
 ```
 
 ## Basic Usage:
