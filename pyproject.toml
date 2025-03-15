@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "PostQuantum-Feldman-VSS"
-version = "0.7.6b0"
+version = "0.7.7b0"
 authors = [
   { name = "David Osipov", email = "personal@david-osipov.vision" },
 ]
