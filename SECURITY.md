@@ -6,8 +6,8 @@ Currently, PostQuantum-Feldman-VSS is in beta. Only the latest beta version rece
 
 | Version    | Supported          |
 | ---------- | ------------------ |
-| 0.7.6b0   | :white_check_mark: |
-| < 0.7.6b0 | :x:                |
+| 0.7.7b0   | :white_check_mark: |
+| < 0.7.7b0 | :x:                |
 
 ## Reporting a Vulnerability
 

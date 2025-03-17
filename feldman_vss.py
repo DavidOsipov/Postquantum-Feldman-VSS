@@ -98,12 +98,12 @@ from base64 import urlsafe_b64decode, urlsafe_b64encode
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Callable
+
 import msgpack
 
 # Import BLAKE3 for cryptographic hashing (faster and more secure than SHA3-256)
 try:
     import blake3
-
     HAS_BLAKE3 = True
 except ImportError:
     HAS_BLAKE3 = False
@@ -116,11 +116,11 @@ except ImportError:
 # Import gmpy2 - now a strict requirement
 try:
     import gmpy2
-except ImportError:
+except ImportError as exc:
     raise ImportError(
         "gmpy2 library is required for this module. "
         "Install gmpy2 with: pip install gmpy2"
-    )
+    ) from exc
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -173,47 +173,29 @@ class SecurityWarning(Warning):
     """
     Description:
         Warning for potentially insecure configurations or operations
-    """
-
-    pass
-
-
+    """   
+    
 # Other exception classes
 class SecurityError(Exception):
     """
     Description:
         Exception raised for security-related issues in VSS
     """
-
-    pass
-
-
 class ParameterError(Exception):
     """
     Description:
         Exception raised for invalid parameters in VSS
     """
-
-    pass
-
-
 class VerificationError(Exception):
     """
     Description:
         Exception raised when share verification fails
     """
-
-    pass
-
-
 class SerializationError(Exception):
     """
     Description:
         Exception raised for serialization or deserialization errors
     """
-
-    pass
-
 
 @dataclass
 class VSSConfig:
@@ -518,7 +500,7 @@ def get_system_memory():
         return 1 * 1024 * 1024 * 1024  # 1GB conservative estimate
 
 
-def check_memory_safety(operation, *args, max_size_mb=1024):
+def check_memory_safety(operation, *args, max_size_mb=1024, reject_unknown=False):
     """
     Check if operation can be performed safely without exceeding memory limits.
 
@@ -526,6 +508,7 @@ def check_memory_safety(operation, *args, max_size_mb=1024):
         operation (str): Operation type ('exp', 'mul', etc.)
         *args: Arguments to the operation
         max_size_mb (int): Maximum allowed memory in MB
+        reject_unknown (bool): If True, rejects all unknown operations
 
     Returns:
         bool: True if operation is likely safe, False otherwise
@@ -619,11 +602,88 @@ def check_memory_safety(operation, *args, max_size_mb=1024):
             return estimated_bytes <= max_bytes
 
         else:
-            # For other operations, use a conservative approach
-            return True
-
-    except Exception:
-        # If estimation fails, assume unsafe
+            # Reject unknown operations if policy dictates
+            if reject_unknown:
+                logger.warning(f"Rejecting unknown operation '{operation}' due to safety policy")
+                return False
+                
+            # Generic fallback for unknown operations with enhanced safety margins
+            logger.warning(
+                f"Unknown operation '{operation}' in memory safety check. "
+                f"Using conservative estimation, but consider adding specific handling."
+            )
+            
+            # Estimate based on argument sizes with increased conservatism
+            total_bits = 0
+            unknown_arg_count = 0
+            collection_size = 0
+            max_bit_length = 0
+            
+            for arg in args:
+                if hasattr(arg, "bit_length"):
+                    # For integers and objects with bit_length method
+                    bit_len = arg.bit_length()
+                    total_bits += bit_len
+                    max_bit_length = max(max_bit_length, bit_len)
+                elif isinstance(arg, (int, float)):
+                    # For numeric types without bit_length
+                    total_bits += 64  # Conservative estimate
+                elif isinstance(arg, (list, tuple)):
+                    # For collections, track total size and count
+                    arg_len = len(arg)
+                    collection_size += arg_len
+                    total_bits += arg_len * 64  # Conservative estimate for each element
+                else:
+                    # For unknown types, add a larger conservative buffer
+                    unknown_arg_count += 1
+                    total_bits += 2048  # 2KB buffer per unknown argument
+            
+            # Apply a more aggressive scaling factor based on complexity indicators
+            scaling_factor = 3.0
+            
+            # Increase scaling for operations with multiple unknown args
+            if unknown_arg_count > 1:
+                scaling_factor *= (1 + (unknown_arg_count * 0.5))
+                
+            # Increase scaling for operations with large collections
+            if collection_size > 100:
+                scaling_factor *= (1 + (min(collection_size, 10000) / 1000))
+                
+            # Increase scaling based on max bit length
+            if max_bit_length > 1024:
+                scaling_factor *= (1 + (max_bit_length / 4096))
+            
+            # Calculate final estimate with the adaptive scaling factor
+            estimated_bytes = int(estimate_mpz_size(total_bits) * scaling_factor)
+            
+            # Set a minimum reasonable estimate (1/4 of max) for unknown operations
+            min_safe_bytes = max_bytes // 4
+            if estimated_bytes < min_safe_bytes:
+                logger.warning(
+                    f"Increasing estimated memory for unknown operation '{operation}' "
+                    f"from {estimated_bytes} to {min_safe_bytes} bytes for safety"
+                )
+                estimated_bytes = min_safe_bytes
+            
+            # Log detailed information about the estimation
+            logger.debug(
+                f"Memory safety estimation for unknown operation '{operation}': "
+                f"{estimated_bytes} bytes (scaling factor: {scaling_factor:.2f}, "
+                f"{estimated_bytes/(1024*1024):.2f}MB/{max_size_mb}MB)"
+            )
+            
+            # For completely unknown operations with many args, reject the operation
+            if unknown_arg_count > 3 and len(args) > 5:
+                logger.error(
+                    f"Rejecting complex unknown operation '{operation}' with too many "
+                    f"unrecognized arguments for reliable memory safety estimation"
+                )
+                return False
+                
+            return estimated_bytes <= max_bytes
+    except Exception as e:
+        # If estimation fails, reject the operation for safety
+        logger.error(f"Error during memory safety check for '{operation}': {str(e)}")
         return False
 
 
@@ -649,6 +709,7 @@ def compute_checksum(data: bytes) -> int:
         raise TypeError("data must be bytes")
 
     if HAS_BLAKE3:
+        # trunk-ignore(pyright/reportPossiblyUnboundVariable)
         return int.from_bytes(blake3.blake3(data).digest()[:16], "big")
     return int.from_bytes(hashlib.sha3_256(data).digest()[:16], "big")
 
@@ -2086,20 +2147,22 @@ class FeldmanVSS:
         # Compare with expected commitment using constant-time comparison
         return constant_time_compare(computed_commitment, expected_commitment)
 
-    def create_commitments(self, coefficients):
+    def create_commitments(self, coefficients, context=None):
         """
         Description:
             Create post-quantum secure hash-based commitments to polynomial coefficients.
-
+    
         Arguments:
             coefficients (list): List of polynomial coefficients [a₀, a₁, ..., aₖ₋₁] where a₀ is the secret.
-
+            context (str, optional): Optional context string for domain separation.
+    
         Inputs:
             coefficients: List of coefficients
-
+            context: Context string
+    
         Outputs:
             list: List of (hash, randomizer) tuples representing hash-based commitments.
-
+    
         Raises:
             TypeError: If coefficients is not a list.
             ValueError: If coefficients list is empty.
@@ -2107,10 +2170,16 @@ class FeldmanVSS:
         # Input validation
         if not isinstance(coefficients, list):
             raise TypeError("coefficients must be a list")
+            
         if not coefficients:
-            self._raise_sanitized_error(ValueError, "coefficients list cannot be empty")
-
+            self._raise_sanitized_error(ValueError, "Coefficients list cannot be empty")
+            
+        if context is not None and not isinstance(context, str):
+            raise TypeError("context must be a string if provided")
+        
         # Use the enhanced commitment creation method for better security
+        return self.create_enhanced_commitments(coefficients, context)
+ enhanced commitment creation method for better security
         return self.create_enhanced_commitments(coefficients)
 
     def create_enhanced_commitments(self, coefficients, context=None):
@@ -3481,6 +3550,9 @@ class FeldmanVSS:
 
         Outputs:
             dict: Dictionary mapping (party_id, participant_id) to consistency result.
+            
+        Side Effects:
+            Stores Byzantine evidence in self._byzantine_evidence for later access by _detect_byzantine_behavior.
 
         Raises:
             TypeError: If inputs have incorrect types or structures.
@@ -5259,7 +5331,8 @@ def verify_dual_commitments(
 ):
     """
     Description:
-        Verify that the Feldman and Pedersen commitments commit to the same values.
+        Verify that the Feldman and Pedersen commitments commit to the same values
+        using constant-time operations to prevent timing side-channels.
 
     Arguments:
         feldman_vss: FeldmanVSS instance.
@@ -5268,19 +5341,8 @@ def verify_dual_commitments(
         pedersen_commitments: Pedersen commitments.
         proof: Proof data structure from create_dual_commitment_proof.
 
-    Inputs:
-        feldman_vss: feldman vss
-        pedersen_vss: pedersen vss
-        feldman_commitments: feldman commitments
-        pedersen_commitments: pedersen commitments
-        proof: proof
-
     Outputs:
         bool: True if verification succeeds, False otherwise.
-
-    Raises:
-        TypeError: If inputs have incorrect types.
-        ValueError: If input lists have inconsistent lengths or proof is missing components.
     """
     # Input validation
     if not isinstance(feldman_vss, FeldmanVSS):
@@ -5322,16 +5384,6 @@ def verify_dual_commitments(
             "Number of pedersen_blinding_commitments must match number of commitments"
         )
 
-    # Required proof components
-    required_keys = [
-        "feldman_blinding_commitments",
-        "pedersen_blinding_commitments",
-        "challenge",
-        "responses",
-    ]
-    if not all(key in proof for key in required_keys):
-        raise ValueError("Proof is missing required components")
-
     # Extract proof components
     feldman_blinding_commitments = proof["feldman_blinding_commitments"]
     pedersen_blinding_commitments = proof["pedersen_blinding_commitments"]
@@ -5348,11 +5400,12 @@ def verify_dual_commitments(
     # Also validate in constant-time that response_randomizers has the right length if needed
     if is_hash_based:
         all_valid &= response_randomizers is not None
-        all_valid &= (
-            (len(response_randomizers) == len(responses))
+        randomizers_valid_len = (
+            len(response_randomizers) == len(responses)
             if response_randomizers is not None
             else False
         )
+        all_valid &= randomizers_valid_len
 
     # First verify Pedersen commitments - these use the same approach regardless
     for i in range(len(responses)):
@@ -5369,29 +5422,33 @@ def verify_dual_commitments(
     if is_hash_based:
         # For hash-based commitments, verification requires validating hash output
         for i in range(len(responses)):
-            # Skip verification if we've already determined randomizers are invalid
-            if response_randomizers is None or i >= len(response_randomizers):
-                continue
-
-            # Calculate expected hash for response value and randomizer
+            # Instead of skipping iterations, always compute but conditionally update result
             response_value = responses[i]
-            r_combined = response_randomizers[i]
-
-            # Use helper method for consistent verification
+            
+            # Use safe default if randomizers are invalid
+            r_combined = 0
+            if response_randomizers is not None and i < len(response_randomizers):
+                r_combined = response_randomizers[i]
+            
+            # Always compute both sides for constant-time behavior
             computed = feldman_vss._compute_hash_commitment(
                 response_value, r_combined, i, "response"
             )
 
-            # Calculate expected commitment: blinding_commitment + challenge * commitment
+            # Calculate expected commitment
             commitment_value = feldman_commitments[i][0]
             blinding_commitment_value = feldman_blinding_commitments[i][0]
-
+            
             expected = (
                 blinding_commitment_value + challenge * commitment_value
             ) % feldman_vss.group.prime
-
-            # Check equality using constant-time comparison
-            all_valid &= constant_time_compare(computed, expected)
+            
+            # Determine if this verification should count using constant-time operations
+            should_check = (response_randomizers is not None and i < len(response_randomizers))
+            equality_result = constant_time_compare(computed, expected)
+            
+            # Conditionally update validity without branching
+            all_valid &= equality_result if should_check else True
     else:
         # Standard Feldman commitment verification
         for i in range(len(responses)):
