@@ -43,11 +43,6 @@ jobs:
         with:
           snyk-version: latest
 
-      - name: Authenticate Snyk
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
-        run: snyk auth SNYK_TOKEN --auth-type=token 
-
       - name: Set up Python
         uses: actions/setup-python@19e4675e06535f6b54e894da5c1f044400bb4996
         with:
@@ -71,6 +66,8 @@ jobs:
         # Runs Snyk Open Source (SCA) analysis and uploads result to Snyk.
       - name: Snyk Open Source monitor
         continue-on-error: true # To make sure that SARIF upload gets called
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
         run: snyk test --all-projects
 
         # Push the Snyk Code results into GitHub Code Scanning tab
