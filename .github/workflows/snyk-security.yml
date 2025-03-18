@@ -60,6 +60,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
         with:
+          args: --sarif-file-output=snyk-vulnerabilities.sarif
           command: monitor
          
 
@@ -68,10 +69,12 @@ jobs:
         continue-on-error: true # To make sure that SARIF upload gets called
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
-        run: snyk test --all-projects
+        run: snyk test monitor --all-projects --sarif-file-output=snyk-SCA.sarif 
 
         # Push the Snyk Code results into GitHub Code Scanning tab
       - name: Upload result to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@6349095d19ec30397ffb02a63b7aa4f867deb563
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
         with:
-          sarif_file: snyk-code.sarif
+          sarif_file: snyk-vulnerabilities.sarif snyk-SCA.sarif
