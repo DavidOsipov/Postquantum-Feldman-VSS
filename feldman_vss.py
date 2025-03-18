@@ -546,7 +546,10 @@ def constant_time_compare(a: Union[int, str, bytes], b: Union[int, str, bytes]) 
     # Convert to bytes for consistent handling
     if isinstance(a, int) and isinstance(b, int):
         # For integers, ensure same bit length with padding
-        bit_length: int = max(a.bit_length(), b.bit_length(), 8)  # Minimum 8 bits
+        # Handle the case where a or b might be 0 (which doesn't have bit_length directly applicable)
+        a_bits = a.bit_length() if a != 0 and hasattr(a, 'bit_length') else 0
+        b_bits = b.bit_length() if b != 0 and hasattr(b, 'bit_length') else 0
+        bit_length: int = max(a_bits, b_bits, 8)  # Minimum 8 bits
         byte_length: int = (bit_length + 7) // 8
         a_bytes: bytes = a.to_bytes(byte_length, byteorder="big")
         b_bytes: bytes = b.to_bytes(byte_length, byteorder="big")
@@ -588,7 +591,8 @@ def estimate_mpz_size(n: Union[int, "gmpy2.mpz"]) -> int:
     """
     if isinstance(n, (int, gmpy2.mpz)):
         bit_length: int = (
-            n.bit_length() if hasattr(n, "bit_length") else gmpy2.mpz(n).bit_length()
+            n.bit_length() if hasattr(n, "bit_length") and n != 0 else 
+            gmpy2.mpz(n).bit_length() if n != 0 else 0
         )
     else:
         bit_length = n  # Assume n is already a bit length
@@ -775,14 +779,14 @@ def check_memory_safety(operation: str, *args: Any, max_size_mb: int = 1024, rej
             b: Any
             a, b = args
             a_bits: int = (
-                a.bit_length()
-                if hasattr(a, "bit_length")
-                else gmpy2.mpz(a).bit_length()
+                a.bit_length() if hasattr(a, "bit_length") and a != 0 
+                else gmpy2.mpz(a).bit_length() if a != 0 
+                else 0
             )
             b_bits: int = (
-                b.bit_length()
-                if hasattr(b, "bit_length")
-                else gmpy2.mpz(b).bit_length()
+                b.bit_length() if hasattr(b, "bit_length") and b != 0
+                else gmpy2.mpz(b).bit_length() if b != 0
+                else 0
             )
             result_bits = a_bits + b_bits  # Multiplication roughly adds bit lengths
             estimated_bytes = estimate_mpz_size(result_bits)
@@ -1016,7 +1020,7 @@ def secure_redundant_execution(
             logger.error(detailed_message)
 
             # Use sanitization function if provided
-            if callable(sanitize_error_func):
+            if sanitize_error_func is not None and callable(sanitize_error_func):
                 sanitized_message: str = sanitize_error_func(message, detailed_message)
                 raise SecurityError(sanitized_message)
             else:
@@ -1083,7 +1087,7 @@ def secure_redundant_execution(
                 logger.error(detailed_message)
 
                 # Use sanitization function if provided, otherwise use the generic message
-                if callable(sanitize_error_func):
+                if sanitize_error_func is not None and callable(sanitize_error_func):
                     sanitized_message = sanitize_error_func(message, detailed_message)
                     raise SecurityError(sanitized_message)
                 else:
@@ -1103,7 +1107,7 @@ def secure_redundant_execution(
         message: str = "Security validation process failed"
         logger.error(detailed_message)
 
-        if callable(sanitize_error_func):
+        if sanitize_error_func is not None and callable(sanitize_error_func):
             sanitized_message: str = sanitize_error_func(message, detailed_message)
             raise SecurityError(sanitized_message) from e
         else:
