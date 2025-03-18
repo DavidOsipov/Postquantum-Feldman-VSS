@@ -36,7 +36,12 @@ dependencies = [
   "msgpack == 1.1.0",
   "blake3 == 1.0.4; platform_system != 'Emscripten'",
 ]
+
+[tool.poetry]
 package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.9,<4.0"
 
 [project.optional-dependencies]
 memory_monitor = ["psutil == 7.0.0"]
