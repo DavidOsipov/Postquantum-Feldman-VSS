@@ -53,7 +53,7 @@ jobs:
           if [ -f pyproject.toml ]; then pip install poetry && poetry install; fi
 
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/python-3.10@4a528b5c534bb771b6e3772656a8e0e9dc902f8b
+        uses: snyk/actions/python-3.10@cdb760004ba9ea4d525f2e043745dfe85bb9077e
         continue-on-error: true # To make sure that SARIF upload gets called
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
