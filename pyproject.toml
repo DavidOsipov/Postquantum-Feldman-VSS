@@ -36,6 +36,7 @@ dependencies = [
   "msgpack == 1.1.0",
   "blake3 == 1.0.4; platform_system != 'Emscripten'",
 ]
+package-mode = false
 
 [project.optional-dependencies]
 memory_monitor = ["psutil == 7.0.0"]
@@ -111,7 +112,7 @@ line-length = 88
 target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.12.7"
 warn_unused_configs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
