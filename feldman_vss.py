@@ -135,6 +135,7 @@ Developer: David Osipov
 #   "gmpy2 == 2.2.1",
 #   "msgpack == 1.1.0",
 #   "blake3 == 1.0.4; platform_system != 'Emscripten'",
+#   "psutil == 7.0.0; os_name != 'Emscripten'" # Optional dependency
 # ]
 # ///
 
@@ -154,7 +155,7 @@ from base64 import urlsafe_b64decode, urlsafe_b64encode
 from collections import OrderedDict
 from typing import (
     Any, Dict, List, Tuple, Optional, Union,
-    Callable, TypeVar, Generic, NoReturn, Type, Set
+    Callable, TypeVar, Generic, NoReturn, Type, Set, TypedDict,
 )
 from dataclasses import dataclass
 import msgpack
@@ -697,7 +698,7 @@ def get_system_memory() -> int:
     try:
         import psutil
 
-        return psutil.virtual_memory().available
+        return int(psutil.virtual_memory().available)
     except ImportError:
         # If psutil not available, use a conservative default
         return 1 * 1024 * 1024 * 1024  # 1GB conservative estimate
@@ -5743,7 +5744,8 @@ def integrate_with_pedersen(feldman_vss: FeldmanVSS, pedersen_vss: Any, shares: 
         TypeError: If inputs have incorrect types.
     """
     # Input validation
-    if not isinstance(feldman_vss, FeldmanVSS instance")
+    if not isinstance(feldman_vss, FeldmanVSS):
+        raise TypeError("feldman_vss must be a FeldmanVSS instance")
     if not hasattr(pedersen_vss, "create_commitments"):
         raise TypeError("pedersen_vss must have a create_commitments method")
     if not isinstance(shares, dict):

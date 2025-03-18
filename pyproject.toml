@@ -36,22 +36,8 @@ dependencies = [
   "blake3 == 1.0.4; platform_system != 'Emscripten'",
 ]
 
-[project.urls]
-Homepage = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS"
-Issues = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/issues"
-Source = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS"
-documentation = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki"
-"Security Advisories" = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/security/advisories"
-"Security Policy" = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/security/policy"
-"Personal Website" = "https://david-osipov.vision"
-"LinkedIn" = "https://www.linkedin.com/in/david-osipov"
-"GitHub Profile" = "https://github.com/DavidOsipov"
-"ISNI" = "https://isni.org/isni/000000051802960X"
-"ORCID" = "https://orcid.org/0009-0005-2713-9242"
-"Telegram" = "https://telegram.me/david_osipov"
-"Signal" =  "https://signal.me/#eu/d68l1UjrWlGVRzbfkVM1bvQMNqCqiae9GM86P_af8ZK2o5E5YSNKbL4MyM9y-2WH"
-
 [project.optional-dependencies]
+memory_monitor = ["psutil == 7.0.0"]
 test = [
     "pytest >= 7.0",
     "pytest-cov >= 4.0",
@@ -74,6 +60,21 @@ dev = [
     "types-requests",
     "types-setuptools",
 ]
+
+[project.urls]
+Homepage = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS"
+Issues = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/issues"
+Source = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS"
+documentation = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki"
+"Security Advisories" = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/security/advisories"
+"Security Policy" = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/security/policy"
+"Personal Website" = "https://david-osipov.vision"
+"LinkedIn" = "https://www.linkedin.com/in/david-osipov"
+"GitHub Profile" = "https://github.com/DavidOsipov"
+"ISNI" = "https://isni.org/isni/000000051802960X"
+"ORCID" = "https://orcid.org/0009-0005-2713-9242"
+"Telegram" = "https://telegram.me/david_osipov"
+"Signal" =  "https://signal.me/#eu/d68l1UjrWlGVRzbfkVM1bvQMNqCqiae9GM86P_af8ZK2o5E5YSNKbL4MyM9y-2WH"
 
 # Use py-modules instead of packages.find for a single-file module
 [tool.setuptools]
@@ -129,6 +130,7 @@ module = [
     "pytest.*",
     "hypothesis.*",
     "sphinx.*",
+    "psutil.*"
 ]
 ignore_missing_imports = true
 
