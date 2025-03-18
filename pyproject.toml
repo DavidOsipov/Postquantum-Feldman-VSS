@@ -59,6 +59,7 @@ dev = [
     "pre-commit >= 3.6",
     "types-requests",
     "types-setuptools",
+    "msgpack-types == 0.5.0"
 ]
 
 [project.urls]
