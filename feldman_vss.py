@@ -130,7 +130,7 @@ Developer: David Osipov
     """
 
 # /// script
-# requires-python = ">=3.8"
+# requires-python = ">=3.8.1"
 # dependencies = [
 #   "gmpy2 == 2.2.1",
 #   "msgpack == 1.1.0",
