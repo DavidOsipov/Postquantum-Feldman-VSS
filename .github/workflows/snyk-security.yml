@@ -47,6 +47,9 @@ jobs:
         uses: actions/setup-python@19e4675e06535f6b54e894da5c1f044400bb4996
         with:
           python-version: '3.12.7'
+
+      - name: Create Sarif file's dir
+        run: mkdir sarif
           
       - name: Install dependencies
         run: |
@@ -60,7 +63,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
         with:
-          args: --sarif-file-output=./sarif/snyk-vulnerabilities.sarif
+          args: --sarif-file-output=/sarif/snyk-vulnerabilities.sarif
           command: monitor
          
 
@@ -69,7 +72,7 @@ jobs:
         continue-on-error: true # To make sure that SARIF upload gets called
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
-        run: snyk test monitor --all-projects --sarif-file-output=./sarif/snyk-SCA.sarif 
+        run: snyk test monitor --all-projects --sarif-file-output=/sarif/snyk-SCA.sarif 
 
         # Push the Snyk Code results into GitHub Code Scanning tab
       - name: Upload result to GitHub Code Scanning
@@ -77,4 +80,4 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
         with:
-          sarif_file: ./sarif/
+          sarif_file: /sarif
