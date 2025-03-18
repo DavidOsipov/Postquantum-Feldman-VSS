@@ -6,8 +6,8 @@ Currently, PostQuantum-Feldman-VSS is in beta. Only the latest beta version rece
 
 | Version    | Supported          |
 | ---------- | ------------------ |
-| 0.7.7b0   | :white_check_mark: |
-| < 0.7.7b0 | :x:                |
+| 0.8.0b2   | :white_check_mark: |
+| < 0.8.0b2 | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -49,7 +49,7 @@ Please provide the following information in your report:
 
 **Important Considerations:**
 
-*   This library is currently in beta (`0.7.6b0`) and has *not* undergone a formal security audit. It is **not recommended for use in production environments** without a thorough independent security review.
+*   This library is currently in beta and has *not* undergone a formal security audit. It is **not recommended for use in production environments** without a thorough independent security review.
 *   The library includes several known potential vulnerabilities (documented in the `README.md` and in GitHub Security Advisories). Please review these before reporting a vulnerability to avoid duplication. The known issues, including those requiring mitigation through lower-level implementations (e.g., in Rust), are tracked via the linked GHSA IDs.
 * **False-Positive Vulnerabilities**: The usage of `random.Random()` seeded with cryptographic material in `_refresh_shares_additive` is an intentional design decision and is *not* a vulnerability.
 
