@@ -2,9 +2,11 @@
     "python.analysis.typeCheckingMode": "strict",
     "python.analysis.autoImportCompletions": true,
     "snyk.trustedFolders": [
+        "C:\\Users\\Sina\\Documents\\PostQuantum-Feldman-VSS\\PostQuantum-Feldman-VSS",
         "${workspaceFolder}",
         "${workspaceFolder}/.vscode",
         "${workspaceFolder}/.devcontainer",
         "${workspaceFolder}/.devcontainer/requirements.txt"
     ],
+    "snyk.folderConfigs": [],
 }
