@@ -36,6 +36,9 @@ dependencies = [
   "msgpack == 1.1.0",
   "blake3 == 1.0.4; platform_system != 'Emscripten'",
 ]
+packages = [
+    { include = "PostQuantum-Feldman-VSS" }
+]
 
 [tool.poetry]
 package-mode = true
