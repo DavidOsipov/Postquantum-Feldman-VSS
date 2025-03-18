@@ -36,15 +36,6 @@ dependencies = [
   "msgpack == 1.1.0",
   "blake3 == 1.0.4; platform_system != 'Emscripten'",
 ]
-packages = [
-    { include = "PostQuantum-Feldman-VSS" }
-]
-
-[tool.poetry]
-package-mode = true
-
-[tool.poetry.dependencies]
-python = ">=3.9,<4.0"
 
 [project.optional-dependencies]
 memory_monitor = ["psutil == 7.0.0"]
@@ -72,7 +63,6 @@ documentation = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki"
 "Telegram" = "https://telegram.me/david_osipov"
 "Signal" =  "https://signal.me/#eu/d68l1UjrWlGVRzbfkVM1bvQMNqCqiae9GM86P_af8ZK2o5E5YSNKbL4MyM9y-2WH"
 
-# Use py-modules instead of packages.find for a single-file module
 [tool.setuptools]
 py-modules = ["feldman_vss"]
 
