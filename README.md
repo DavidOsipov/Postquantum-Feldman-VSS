@@ -169,6 +169,7 @@ The following sources were used as references and inspiration for the creation o
 *   Cramer, R., Damgård, I., & Nielsen, J. B. (2015). Secure Multiparty Computation and Secret Sharing. Cambridge University Press.
 *   National Institute of Standards and Technology (NIST). (2013). Recommendation for Applications Using Approved Hash Algorithms. NIST Special Publication 800-107 Revision 1.
 *   National Institute of Standards and Technology (NIST). (2020). Recommendation for Pair-Wise Key Establishment Schemes Using Discrete Logarithm Cryptography NIST Special Publication 800-56A, Revision 3.
+*   Kivinen, T. & Kojo, M. (2003). More Modular Exponential (MODP) Diffie-Hellman groups for Internet Key Exchange (IKE). RFC 3526. [Link](https://datatracker.ietf.org/doc/html/rfc3526).  *This RFC provides the safe prime values used in the library's default configuration for 3072, 4096, 6144, and 8192-bit groups.*
 
 ## License:
 
