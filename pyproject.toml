@@ -64,11 +64,11 @@ documentation = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki"
 "Signal" =  "https://signal.me/#eu/d68l1UjrWlGVRzbfkVM1bvQMNqCqiae9GM86P_af8ZK2o5E5YSNKbL4MyM9y-2WH"
 
 [tool.setuptools]
-py-modules = ["feldman_vss"]
+py-modules = ["feldman_vss.py"]
 
 [tool.poetry]
 packages = [
-    { include = "feldman_vss", from = "." }
+    { include = "feldman_vss.py", from = "." }
 ]
 
 [tool.poetry.dependencies]
@@ -94,7 +94,7 @@ pythonpath = ["."]
 
 [tool.coverage.run]
 branch = true
-source = ["feldman_vss"]
+source = ["feldman_vss.py"]
 omit = ["tests/*"]
 
 [tool.coverage.report]
