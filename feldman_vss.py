@@ -1,7 +1,7 @@
 """
 Post-Quantum Secure Feldman's Verifiable Secret Sharing (VSS) Implementation
 
-Version 0.8.0b2
+Version 0.8.0b3
 Developed in 2025 by David Osipov
 Licensed under the MIT License
 
@@ -190,7 +190,7 @@ logging.basicConfig(
 logger = logging.getLogger("feldman_vss")
 
 # Security parameters
-VSS_VERSION = "VSS-0.8.0b2"
+VSS_VERSION = "VSS-0.8.0b3"
 # Minimum size for secure prime fields for post-quantum security
 MIN_PRIME_BITS = 4096
 
