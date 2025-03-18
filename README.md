@@ -55,10 +55,10 @@ cd PostQuantum-Feldman-VSS
 ## Basic Usage:
 
 ```python
-from feldman_vss_pq import FeldmanVSS, get_feldman_vss, VSSConfig, CyclicGroup, create_vss_from_shamir
+from feldman_vss import FeldmanVSS, get_feldman_vss, VSSConfig, CyclicGroup, create_vss_from_shamir
 from shamir_secret_sharing import ShamirSecretSharing  # Assuming you have a Shamir implementation
 
-# Example using a Shamir instance (replace with your actual Shamir implementation)
+# Example using a Shamir instance
 shamir = ShamirSecretSharing(5, 3)  # 5 shares, threshold of 3
 secret = 1234567890
 shares = shamir.split_secret(secret)
@@ -67,7 +67,7 @@ shares = shamir.split_secret(secret)
 vss = create_vss_from_shamir(shamir)
 
 # Generate commitments and a zero-knowledge proof
-coefficients = shamir.generate_coefficients(secret)
+coefficients = shamir.get_polynomial_coefficients(secret)  # Actual method may vary
 commitments, proof = vss.create_commitments_with_proof(coefficients)
 
 # Verify the proof
@@ -75,7 +75,8 @@ is_valid = vss.verify_commitments_with_proof(commitments, proof)
 print(f"Proof Verification: {is_valid}")  # Expected: True
 
 # Verify a share
-share_x, share_y = list(shares.items())[0]  # Example share, get first item
+share_id = list(shares.keys())[0]  # Get the first share ID
+share_x, share_y = shares[share_id]  # Get the (x,y) coordinates
 is_share_valid = vss.verify_share(share_x, share_y, commitments)
 print(f"Share Verification: {is_share_valid}")  # Expected: True
 
@@ -90,14 +91,35 @@ new_shares, new_commitments, verification_data = vss.refresh_shares(shares, 3, 5
 
 # --- Example without Shamir ---
 # Example of direct usage (without Shamir, you need a field implementation)
+from your_field_module import PrimeField  # Replace with your field implementation
 
-# from your_module import MersennePrimeField  # Replace with your field implementation
+# Create a field with a sufficiently large prime for post-quantum security
+field = PrimeField(bits=4096)  # Using a 4096-bit prime field
 
-# field = MersennePrimeField(4096)  # Using a 4096-bit prime
-# vss = get_feldman_vss(field)
-# coefficients = [field.random_element() for _ in range(3)]
-# commitments = vss.create_commitments(coefficients)
-# ... (rest of the example similar to above)
+# Create VSS instance
+config = VSSConfig(prime_bits=4096, safe_prime=True)
+vss = get_feldman_vss(field, config=config)
+
+# Generate polynomial coefficients (first coefficient is the secret)
+secret = 12345
+coefficients = [secret]  # First coefficient is the secret
+for i in range(2):  # Add 2 more coefficients for threshold t=3
+    coefficients.append(field.random_element())
+
+# Create commitments
+commitments = vss.create_commitments(coefficients)
+
+# Generate shares
+shares = {}
+for i in range(1, 6):  # Generate 5 shares
+    y = vss._evaluate_polynomial(coefficients, i)
+    shares[i] = (i, y)
+
+# Verify a share
+share_id = 1
+share_x, share_y = shares[share_id]
+is_valid = vss.verify_share(share_x, share_y, commitments)
+print(f"Share {share_id} verification: {is_valid}")
 ```
 
 ## Security Considerations:
