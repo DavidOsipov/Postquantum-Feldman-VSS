@@ -63,7 +63,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
         with:
-          args: --sarif-file-output=sarif/snyk-vulnerabilities.sarif
+          args: --sarif-file-output=sarif/snyk.sarif
          
 
         # Runs Snyk Open Source (SCA) analysis and uploads result to Snyk.
@@ -71,7 +71,7 @@ jobs:
         continue-on-error: true # To make sure that SARIF upload gets called
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
-        run: snyk test monitor --all-projects --sarif-file-output=sarif/snyk-SCA.sarif 
+        run: snyk test monitor --all-projects --sarif-file-output=sarif/snyk.sarif
 
         # Push the Snyk Code results into GitHub Code Scanning tab
       - name: Upload result to GitHub Code Scanning
@@ -79,4 +79,4 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
         with:
-          sarif_file: sarif
+          sarif_file: sarif/snyk.sarif
