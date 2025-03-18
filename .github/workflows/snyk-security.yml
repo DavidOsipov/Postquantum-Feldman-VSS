@@ -52,6 +52,11 @@ jobs:
           if [ -f Pipfile ]; then pip install pipenv && pipenv install --dev; fi
           if [ -f pyproject.toml ]; then pip install poetry && poetry install; fi
 
+      - name: Set up Snyk
+        uses: snyk/actions/setup@9213221444c2dc9e8b2502c1e857c26d851e84a7
+        with:
+          snyk-version: latest
+
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/python-3.10@cdb760004ba9ea4d525f2e043745dfe85bb9077e
         continue-on-error: true # To make sure that SARIF upload gets called
