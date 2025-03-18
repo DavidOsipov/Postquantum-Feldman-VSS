@@ -71,7 +71,7 @@ jobs:
         continue-on-error: true # To make sure that SARIF upload gets called
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
-        run: snyk test --all-projects --sarif-file-output=sarif/snyk.sarif
+        run: snyk test --all-projects --sarif-file-output=sarif/snyk-SCA.sarif
 
         # Push the Snyk Code results into GitHub Code Scanning tab
       - name: Upload result to GitHub Code Scanning
@@ -79,4 +79,4 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
         with:
-          sarif_file: sarif/snyk.sarif
+          sarif_file: sarif
