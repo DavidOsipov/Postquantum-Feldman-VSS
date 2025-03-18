@@ -13,7 +13,7 @@ maintainers = [
 ]
 description = "Post-Quantum Secure Feldman's Verifiable Secret Sharing (VSS) in Python"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9,<4.0"
 license = {text = "MIT"}
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -26,6 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Security",
     "Topic :: Security :: Cryptography",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -38,25 +39,10 @@ dependencies = [
 
 [project.optional-dependencies]
 memory_monitor = ["psutil == 7.0.0"]
-test = [
-    "pytest >= 7.0",
-    "pytest-cov >= 4.0",
-    "pytest-xdist >= 3.0",
-    "hypothesis >= 6.0"
-]
-docs = [
-    "sphinx >= 7.0",
-    "sphinx-rtd-theme >= 2.0",
-    "myst-parser >= 2.0",
-    "sphinx-copybutton >= 0.5",
-    "sphinx-autodoc-typehints >= 2.0",
-]
 dev = [
     "black >= 24.0",
     "isort >= 5.10",
     "flake8 >= 7.0",
-    "mypy >= 1.9",
-    "pre-commit >= 3.6",
     "types-requests",
     "types-setuptools",
     "msgpack-types == 0.5.0"
@@ -77,7 +63,6 @@ documentation = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki"
 "Telegram" = "https://telegram.me/david_osipov"
 "Signal" =  "https://signal.me/#eu/d68l1UjrWlGVRzbfkVM1bvQMNqCqiae9GM86P_af8ZK2o5E5YSNKbL4MyM9y-2WH"
 
-# Use py-modules instead of packages.find for a single-file module
 [tool.setuptools]
 py-modules = ["feldman_vss"]
 
@@ -109,30 +94,6 @@ known_first_party = ["feldman_vss"]
 line-length = 88
 target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
 
-[tool.mypy]
-python_version = "3.8"
-warn_unused_configs = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-no_implicit_optional = true
-strict_optional = true
-warn_return_any = true
-show_error_codes = true
-plugins = ["pydantic.mypy"]
-
-[[tool.mypy.overrides]]
-module = [
-    "gmpy2.*",
-    "msgpack.*",
-    "blake3.*",
-    "pytest.*",
-    "hypothesis.*",
-    "sphinx.*",
-    "psutil.*"
-]
 ignore_missing_imports = true
 
 [tool.flake8]
