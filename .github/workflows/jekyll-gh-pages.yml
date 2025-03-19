@@ -46,3 +46,6 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
           command: pages deploy site/_site
+        env:
+          NODE_VERSION: 20.19.0
+          WRANGLER_VERSION: 4.2.0
