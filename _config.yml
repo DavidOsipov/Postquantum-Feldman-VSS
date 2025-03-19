@@ -1,20 +1,21 @@
 # Jekyll configuration for GitHub Pages
 title: PostQuantum-Feldman-VSS
 description: Post-Quantum Secure Feldman's Verifiable Secret Sharing
+theme: minima  # Or jekyll-theme-minimal, or another supported theme
 
-# Include only specific files and directories
+# Build settings
+markdown: kramdown
+plugins:
+  - jekyll-relative-links
+
+# Process these files as Jekyll files
 include:
-  - "docs/**"
-  - "README.md"
-  - "LICENSE"
+  - "docs/"
   - "SECURITY.md"
+  - "CODE_OF_CONDUCT.md" 
+  - "CONTRIBUTING.md"
 
-# Exclude everything else
-exclude:
-  - "*"
-  - ".*"
-  - "!docs"
-  - "!README.md"
-  - "!LICENSE"
-  - "!SECURITY.md"
-  - "!_config.yml"
+# Relative links configuration
+relative_links:
+  enabled: true
+  collections: true

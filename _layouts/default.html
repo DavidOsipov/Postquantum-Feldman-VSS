@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page.title | default: site.title }}</title>
+  <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+</head>
+<body>
+  <header>
+    <h1>{{ site.title }}</h1>
+    <nav>
+      <ul>
+        <li><a href="{{ '/' | relative_url }}">Home</a></li>
+        <li><a href="{{ '/docs/DOCUMENTATION' | relative_url }}">Documentation</a></li>
+        <li><a href="{{ '/SECURITY' | relative_url }}">Security</a></li>
+        <li><a href="{{ '/CONTRIBUTING' | relative_url }}">Contributing</a></li>
+        <li><a href="{{ '/CODE_OF_CONDUCT' | relative_url }}">Code of Conduct</a></li>
+      </ul>
+    </nav>
+  </header>
+  
+  <main>
+    {{ content }}
+  </main>
+  
+  <footer>
+    <p>&copy; {{ site.time | date: '%Y' }} David Osipov</p>
+  </footer>
+</body>
+</html>
