@@ -31,6 +31,7 @@ jobs:
         run: |
           gem install bundler
           bundle install
+        working-directory: site
 
       - name: Build site
         run: |
