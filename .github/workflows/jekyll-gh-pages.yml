@@ -44,7 +44,7 @@ jobs:
 
       - name: Build site
         run: |
-          bundle exec jekyll build
+          bundle exec jekyll build --source $GITHUB_WORKSPACE --destination $GITHUB_WORKSPACE/site/build
         working-directory: ./site
 
       - name: Publish
@@ -53,6 +53,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          command: pages deploy ./site/build --project-name=postquantum-feldman-vss
-        env:
-          NODE_VERSION: 20.19.0
+          command: pages deploy build --project-name=postquantum-feldman-vss
