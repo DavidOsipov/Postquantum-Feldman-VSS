@@ -45,7 +45,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          command: pages deploy site/_site
+          command: pages deploy site/_site --project-name=postquantum-feldman-vss
         env:
           NODE_VERSION: 20.19.0
           WRANGLER_VERSION: 4.2.0
