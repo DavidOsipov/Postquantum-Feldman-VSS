@@ -15,7 +15,7 @@ platforms :mingw, :x64_mingw, :mswin, :jruby do
 end
 
 # Performance-booster for watching directories on Windows
-gem "wdm", "~> 0.1.1", :platforms => [:mingw, :x64_mingw, :mswin]
+gem "wdm", "~> 0.2.0", :platforms => [:mingw, :x64_mingw, :mswin]
 
 # Lock Jekyll to v4 to prevent GitHub Pages gem from overwriting
 gem "webrick", "~> 1.7" # Required for Ruby 3.0+
