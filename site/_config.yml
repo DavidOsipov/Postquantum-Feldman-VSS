@@ -10,12 +10,13 @@ plugins:
 
 # Process these files as Jekyll files
 include:
-  - "docs/"
-  - "README.md"
-  - "SECURITY.md"
-  - "CODE_OF_CONDUCT.md" 
-  - "CONTRIBUTING.md"
-  - "LICENSE"
+  - "../docs/"
+  - "../README.md"
+  - "../SECURITY.md"
+  - "../CODE_OF_CONDUCT.md" 
+  - "../CONTRIBUTING.md"
+  - "../LICENSE"
+  - "../index.md" # Ensure index.md is included
 
 # Relative links configuration
 relative_links:

@@ -34,7 +34,7 @@ jobs:
 
       - name: Build site
         run: |
-          bundle exec jekyll build --destination .github/_site
+          bundle exec jekyll build --source site --destination .github/_site
 
       - name: Deploy to Cloudflare Pages
         env:
