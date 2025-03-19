@@ -1,0 +1,20 @@
+# Jekyll configuration for GitHub Pages
+title: PostQuantum-Feldman-VSS
+description: Post-Quantum Secure Feldman's Verifiable Secret Sharing
+
+# Include only specific files and directories
+include:
+  - "docs/**"
+  - "README.md"
+  - "LICENSE"
+  - "SECURITY.md"
+
+# Exclude everything else
+exclude:
+  - "*"
+  - ".*"
+  - "!docs"
+  - "!README.md"
+  - "!LICENSE"
+  - "!SECURITY.md"
+  - "!_config.yml"
