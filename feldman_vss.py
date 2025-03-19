@@ -143,14 +143,6 @@ Developer: David Osipov
 # mypy: disallow-incomplete-defs=False
 # pyright: reportOptionalMemberAccess=false
 
-import hashlib
-import logging
-import random
-import secrets
-import threading
-import time
-import traceback
-import warnings
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from collections import OrderedDict
 from typing import (
@@ -159,20 +151,48 @@ from typing import (
     Literal
 )
 from dataclasses import dataclass
-import msgpack
+import hashlib
+import importlib.util
+import logging
+import random
+import secrets
+import threading
+import time
+import warnings
+
+# Initialize blake3 to None
+blake3 = None
+
+# Check if blake3 is available
+has_blake3 = importlib.util.find_spec("blake3") is not None
+if has_blake3:
+    try:
+        import blake3
+    except ImportError:
+        has_blake3 = False
+        warnings.warn(
+            "BLAKE3 library not found. Falling back to SHA3-256. "
+            "Install BLAKE3 with: pip install blake3",
+            ImportWarning,
+        )
 
 # Import BLAKE3 for cryptographic hashing (faster and more secure than SHA3-256)
-import importlib.util
 
-HAS_BLAKE3 = importlib.util.find_spec("blake3") is not None
-if HAS_BLAKE3:
-    import blake3
-else:
-    warnings.warn(
-        "BLAKE3 library not found. Falling back to SHA3-256. "
-        "Install BLAKE3 with: pip install blake3",
-        ImportWarning,
-    )
+# Initialize blake3 to None
+blake3 = None
+
+# Check if blake3 is available
+has_blake3 = importlib.util.find_spec("blake3") is not None
+if has_blake3:
+    try:
+        import blake3
+    except ImportError:
+        has_blake3 = False
+        warnings.warn(
+            "BLAKE3 library not found. Falling back to SHA3-256. "
+            "Install BLAKE3 with: pip install blake3",
+            ImportWarning,
+        )
 
 # Import gmpy2 - now a strict requirement
 try:
@@ -182,6 +202,7 @@ except ImportError as exc:
         "gmpy2 library is required for this module. "
         "Install gmpy2 with: pip install gmpy2"
     ) from exc
+
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -275,6 +296,71 @@ VerificationDataDict = TypedDict('VerificationDataDict', {
     'verification_proofs': Dict[int, Dict[int, Any]]
 })
 
+# New TypedDict definitions for more complex return types
+MemoryUsageStatsDict = TypedDict('MemoryUsageStatsDict', {
+    'current_bytes': int,
+    'current_mb': float,
+    'peak_bytes': int,
+    'peak_mb': float,
+    'max_mb': int,
+    'usage_percent': float,
+    'peak_percent': float
+})
+
+ForensicDataDict = TypedDict('ForensicDataDict', {
+    'message': str,
+    'severity': str,
+    'timestamp': int,
+    'error_type': str,
+    'detailed_info': Optional[str],
+    'share_info': Optional[Dict[str, Any]],
+    'commitment_info': Optional[Dict[str, Any]]
+})
+
+ByzantineDetectionResultDict = TypedDict('ByzantineDetectionResultDict', {
+    'is_byzantine': bool,
+    'failure_count': int,
+    'total_shares': int,
+    'failure_rate': float,
+    'evidence': List[Dict[str, Any]],
+    'affected_participants': List[int],
+    'timestamp': int
+})
+
+DualCommitmentProofDict = TypedDict('DualCommitmentProofDict', {
+    'feldman_blinding_commitments': List[Union[Tuple[FieldElement, FieldElement], FieldElement]],
+    'pedersen_blinding_commitments': List[FieldElement],
+    'challenge': int,
+    'responses': List[int],
+    'response_randomizers': Optional[List[int]]
+})
+
+IntegrationResultDict = TypedDict('IntegrationResultDict', {
+    'feldman_commitments': str,
+    'pedersen_commitments': str,
+    'dual_proof': DualCommitmentProofDict,
+    'version': str
+})
+
+# Type Aliases for Complex Types
+HashFunc = Callable[[bytes], Any]
+RedundantExecutorFunc = Callable[..., Any]
+
+HashCommitment = Tuple[FieldElement, Randomizer, Optional[bytes]]  # (hash, randomizer, entropy)
+CommitmentList = List[HashCommitment]  # List of commitments
+
+ProofDict = TypedDict('ProofDict', {
+    'blinding_commitments': List[Tuple[FieldElement, FieldElement]],
+    'challenge': FieldElement,
+    'responses': List[FieldElement],
+    'commitment_randomizers': List[FieldElement],
+    'blinding_randomizers': List[FieldElement],
+    'timestamp': int
+})
+
+VerificationResult = Tuple[bool, Dict[int, bool]]
+RefreshingResult = Tuple[ShareDict, CommitmentList, Dict[str, Any]]
+
 HashCommitment = Tuple[FieldElement, Randomizer, Optional[bytes]]  # (hash, randomizer, entropy)
 CommitmentList = List[HashCommitment]  # List of commitments
 
@@ -313,10 +399,8 @@ class SecurityError(Exception):
         self.detailed_info = detailed_info
         self.severity = severity
         
-        # Validate timestamp
-        if timestamp is not None and not isinstance(timestamp, int):
-            raise TypeError("timestamp must be an integer or None")
-        self.timestamp = timestamp or int(time.time())
+        # Use the centralized timestamp validation function
+        self.timestamp = validate_timestamp(timestamp)
         
         super().__init__(message)
 class SerializationError(Exception):
@@ -332,10 +416,8 @@ class SerializationError(Exception):
         self.detailed_info = detailed_info
         self.severity = severity
         
-        # Validate timestamp
-        if timestamp is not None and not isinstance(timestamp, int):
-            raise TypeError("timestamp must be an integer or None")
-        self.timestamp = timestamp or int(time.time())
+        # Use the centralized timestamp validation function
+        self.timestamp = validate_timestamp(timestamp)
         
         self.data_format = data_format  # Stores format information about the serialized data
         self.checksum_info = checksum_info  # Stores checksum validation details if applicable
@@ -361,8 +443,8 @@ class SerializationError(Exception):
         
         # Add more details based on detail_level
         if detail_level in ('medium', 'high'):
-            result["detailed_info"] = self.detailed_info
-            result["data_format"] = self.data_format
+            result["detailed_info"] = self.detailed_info or ""
+            result["data_format"] = self.data_format or ""
             
         if detail_level == 'high':
             # Include potentially sensitive checksum information only at high detail level
@@ -476,15 +558,17 @@ class ParameterError(Exception):
         
         # Add more details based on detail_level
         if detail_level in ('medium', 'high'):
-            result["detailed_info"] = self.detailed_info
-            result["parameter_name"] = self.parameter_name
-            result["expected_type"] = self.expected_type
+            result["detailed_info"] = self.detailed_info or ""
+            result["parameter_name"] = self.parameter_name or ""
+            result["expected_type"] = self.expected_type or ""
             
         if detail_level == 'high':
             # Convert parameter value to string at high detail level to ensure safe serialization
             if self.parameter_value is not None:
-                if isinstance(self.parameter_value, (int, str, bool, float)):
+                if isinstance(self.parameter_value, int):
                     result["parameter_value"] = self.parameter_value
+                elif isinstance(self.parameter_value, (str, bool, float)):
+                    result["parameter_value"] = str(self.parameter_value)
                 else:
                     result["parameter_value"] = str(self.parameter_value)
         
@@ -530,7 +614,7 @@ class VSSConfig:
             )
             self.prime_bits = MIN_PRIME_BITS
 
-        if self.use_blake3 and not HAS_BLAKE3:
+        if self.use_blake3 and not has_blake3:
             warnings.warn(
                 "BLAKE3 requested but not installed. Falling back to SHA3-256. "
                 "Install BLAKE3 with: pip install blake3",
@@ -833,12 +917,12 @@ def estimate_exp_result_size(base_bits: int, exponent: Union[int, "gmpy2.mpz"]) 
         int: Estimated bit length of result
     """
     # For modular exponentiation, result won't exceed modulus size
-    if isinstance(exponent, (int, gmpy2.mpz)) and exponent <= 2**30:
+    if exponent <= 2**30:
         # For reasonable exponents, we can estimate more precisely
-        return base_bits * min(exponent, 2**30)
+        return int(base_bits * min(int(exponent), 2**30))
     else:
         # For very large exponents, return a reasonable maximum
-        return base_bits * 2**30  # This would likely exceed memory anyway
+        return int(base_bits * 2**30)  # This would likely exceed memory anyway
 
 
 def get_system_memory() -> int:
@@ -997,6 +1081,7 @@ def check_memory_safety(operation: str, *args: Any, max_size_mb: int = 1024, rej
                     total_bits += 64  # Conservative estimate
                 elif isinstance(arg, (list, tuple)):
                     # For collections, track total size and count
+                    # All lists and tuples have length in Python
                     arg_len: int = len(arg)
                     collection_size += arg_len
                     total_bits += arg_len * 64  # Conservative estimate for each element
@@ -1047,13 +1132,6 @@ def check_memory_safety(operation: str, *args: Any, max_size_mb: int = 1024, rej
                 )
                 return False
                 
-            return estimated_bytes <= max_bytes
-    except Exception as e:
-        # If estimation fails, reject the operation for safety
-        logger.error(f"Error during memory safety check for '{operation}': {str(e)}")
-        return False
-
-
 def compute_checksum(data: bytes) -> int:
     """
     Description:
@@ -1075,7 +1153,7 @@ def compute_checksum(data: bytes) -> int:
     if not isinstance(data, bytes):
         raise TypeError("data must be bytes")
 
-    if HAS_BLAKE3:
+    if has_blake3 and blake3 is not None:
         # trunk-ignore(pyright/reportPossiblyUnboundVariable)
         return int.from_bytes(blake3.blake3(data).digest()[:16], "big")
     return int.from_bytes(hashlib.sha3_256(data).digest()[:16], "big")
@@ -1959,7 +2037,7 @@ class CyclicGroup:
                         + block_counter.to_bytes(8, "big")
                     )
 
-                    if HAS_BLAKE3:
+                    if has_blake3:
                         h = blake3.blake3(block_data).digest(
                             min(32, total_bytes - len(hash_blocks))
                         )
@@ -2223,7 +2301,7 @@ class FeldmanVSS:
 
         # Initialize hash algorithm for use in various methods
         self.hash_algorithm: HashFunc = (
-            blake3.blake3 if HAS_BLAKE3 and self.config.use_blake3 else hashlib.sha3_256
+            blake3.blake3 if has_blake3 and self.config.use_blake3 else hashlib.sha3_256
         )
 
     def _sanitize_error(self, message: str, detailed_message: Optional[str] = None) -> str:
@@ -2417,7 +2495,7 @@ class FeldmanVSS:
 
         # Use preferred hash algorithm
         hash_output: bytes
-        if HAS_BLAKE3 and self.config.use_blake3:
+        if has_blake3 and self.config.use_blake3:
             hash_output = blake3.blake3(encoded).digest(32)
         else:
             hash_output = hashlib.sha3_256(encoded).digest()
@@ -2723,18 +2801,20 @@ class FeldmanVSS:
         # Input validation
         if not isinstance(share_x, (int, gmpy2.mpz)):
             raise TypeError("share_x must be an integer")
-        if not isinstance(share_y, (int, gmpy2.mpz)):
+        if not isinstaraise TypeError("share_x must be an integer") (int, gmpy2.mpz)):
             raise TypeError("share_y must be an integer")
         if not isinstance(commitments, list) or not commitments:
             raise TypeError("commitments must be a non-empty list")
 
-        # Validate commitment format
+        # Validate craise TypeError("commitments must be a non-empty list")rmat
         if not all(isinstance(c, tuple) and len(c) >= 2 for c in commitments):
             raise TypeError(
                 "commitments must be a list of (commitment, randomizer) tuples"
             )
 
-        # Convert to integers and use redundant verification
+        # Convert toraise TypeError(
+                "commitments must be a list of (commitment, randomizer) tuples"
+            )d use redundant verification
         x: "gmpy2.mpz"
         y: "gmpy2.mpz"
         x, y = gmpy2.mpz(share_x), gmpy2.mpz(share_y)
@@ -3907,7 +3987,7 @@ class FeldmanVSS:
         )
 
         signature: str
-        if HAS_BLAKE3:
+        if has_blake3:
             signature = blake3.blake3(signature_input).hexdigest()
         else:
             signature = hashlib.sha3_256(signature_input).hexdigest()
@@ -3968,7 +4048,7 @@ class FeldmanVSS:
             "consistency_proof",
         )
         signature: str
-        if HAS_BLAKE3:
+        if has_blake3:
             signature = blake3.blake3(signature_input).hexdigest()
         else:
             signature = hashlib.sha3_256(signature_input).hexdigest()
@@ -4275,7 +4355,7 @@ class FeldmanVSS:
         for party_id, party_commitments in zero_commitments.items():
             # Use a cryptographic hash instead of Python's non-cryptographic hash()
             # This prevents potential hash collisions that could lead to incorrect grouping
-            if HAS_BLAKE3:
+            if has_blake3:
                 hasher = blake3.blake3()
             else:
                 # Fall back to SHA3-256 if BLAKE3 is not available
@@ -6038,7 +6118,7 @@ def create_dual_commitment_proof(
 
     # Hash the challenge input
     challenge_hash: bytes
-    if HAS_BLAKE3:
+    if has_blake3:
         challenge_hash = blake3.blake3(challenge_input).digest()
     else:
         challenge_hash = hashlib.sha3_256(challenge_input).digest()
