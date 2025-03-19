@@ -40,7 +40,7 @@ jobs:
         working-directory: site
 
       - name: Publish
-        uses: cloudflare/wrangler-action@v3.14.1
+        uses: cloudflare/wrangler-action@707f63750981584eb6abc365a50d441516fb04b8
         with:
           apiToken: ${{ secrets.CLOUDFLARE_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -48,4 +48,4 @@ jobs:
           command: pages deploy site/_site --project-name=postquantum-feldman-vss
         env:
           NODE_VERSION: 20.19.0
-          WRANGLER_VERSION: 4.2.0
+          WRANGLER_VERSION: 3.90.0
