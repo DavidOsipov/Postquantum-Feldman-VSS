@@ -20,13 +20,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@1a615958ad9d422dd932dc1d5823942ee002799f
         with:
-          ruby-version: '3.0'
-
+          ruby-version: '3.4.2'
+          cache: bundler
+          
       - name: Install dependencies
         run: |
           gem install bundler
@@ -34,14 +35,14 @@ jobs:
         working-directory: site
 
       - name: Build site
-        run: bundle exec jekyll build --source site --destination build
+        run: |
+          bundle exec jekyll build
         working-directory: site
 
       - name: Publish
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65
         with:
           apiToken: ${{ secrets.CLOUDFLARE_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: "postquantum-feldman-vss"
-          directory: "site/build"
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: pages deploy .github/_site --project-name=postquantum-feldman-vss

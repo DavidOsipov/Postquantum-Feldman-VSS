@@ -17,3 +17,22 @@ include:
 relative_links:
   enabled: true
   collections: true
+
+# Exclude from processing
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - .sass-cache
+
+# Set default layout for all pages
+defaults:
+  -
+    scope:
+      path: "" # all files
+    values:
+      layout: "default"
+
+# Base URL
+baseurl: ""
