@@ -1,23 +1,88 @@
 # Jekyll configuration for GitHub Pages
 title: PostQuantum-Feldman-VSS
 description: Post-Quantum Secure Feldman's Verifiable Secret Sharing
+tagline: A Python implementation of Feldman's Verifiable Secret Sharing designed to be secure against quantum computers
 theme: minima  # Or jekyll-theme-minimal, or another supported theme
+
+# SEO settings
+lang: en_US
+locale: en_US  # Takes priority over lang
+author:
+  name: David Osipov
+  email: personal@david-osipov.vision
+  url: https://david-osipov.vision
+
+# Logo for SEO and publisher validation
+logo: /assets/logo.png
+
+# OpenGraph settings
+og_image: /assets/social-share-image.png
+og_type: website
+
+# Content license information
+license: MIT
+copyright: © 2025 David Osipov
+
+# Jekyll SEO Tag settings
+seo:
+  type: WebSite
+
+# Google Analytics
+google_analytics: 
+
+# Permalink style
+permalink: pretty
+
+# Social media profiles
+social:
+  name: David Osipov
+  links:
+    - https://github.com/DavidOsipov
+    - https://www.linkedin.com/in/david-osipov
+    - https://david-osipov.vision
+    - https://orcid.org/0009-0005-2713-9242
+    - https://isni.org/isni/000000051802960X
+
+# Twitter card
+twitter:
+  username: david_osipov
+  card: summary_large_image
+
+# Facebook Open Graph
+facebook:
+  app_id: 
+  publisher: 
+  admins: 
+
+# Webmaster verifications
+webmaster_verifications:
+  google: 
+  bing: 
+  yandex: 
+  baidu:
+  alexa:
+  facebook:
 
 # Build settings
 markdown: kramdown
 plugins:
   - jekyll-relative-links
   - jekyll-include-cache
+  - jekyll-seo-tag
+  - jekyll-sitemap
 
 # Process these files as Jekyll files
 include:
-  - "../docs/*.md"  # Include all Markdown files in the docs directory
-  - "../*.md"       # Include all Markdown files in the root directory
+  - "/docs/*.md"  # Include all Markdown files in the docs directory
+  - "/*.md"       # Include all Markdown files in the root directory
 
 # Relative links configuration
 relative_links:
   enabled: true
   collections: true
+  paths:
+    - "../docs"
+    - ".."
 
 # Exclude from processing
 exclude:
@@ -34,13 +99,14 @@ defaults:
       path: "" # all files
     values:
       layout: "default"
+      image: /assets/default-social-image.png
 
 # Base URL
-baseurl: ""
+baseurl: "https://postquantum-feldman-vss.david-osipov.vision"
 url: "https://postquantum-feldman-vss.david-osipov.vision"
 
 # Destination directory
-destination: ./build
+destination: ./site/build
 
 # Include files from outside site directory
 include_relative:

@@ -32,12 +32,10 @@ jobs:
         run: |
           gem install bundler
           bundle install
-        working-directory: ./site
 
       - name: Build site
-        working-directory: ./site
         run: |
-          bundle exec jekyll build -d ./build
+          bundle exec jekyll build -d ./site/build
 
       - name: Install Node.js
         uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
@@ -53,6 +51,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          command: pages deploy site/build --project-name=postquantum-feldman-vss
+          command: pages deploy ./site/build --project-name=postquantum-feldman-vss
         env:
           NODE_VERSION: 20.19.0
