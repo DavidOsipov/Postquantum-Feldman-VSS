@@ -8,3 +8,4 @@ title: Home
 {% include_relative ../SECURITY.md %}
 {% include_relative ../CODE_OF_CONDUCT.md %}
 {% include_relative ../CONTRIBUTING.md %}
+{% include_relative ../docs/DOCUMENTATION.md %}
