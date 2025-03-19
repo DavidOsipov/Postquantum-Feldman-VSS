@@ -22,12 +22,14 @@ jobs:
         uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
 
       - name: Setup Ruby
+        id: setup-ruby
         uses: ruby/setup-ruby@1a615958ad9d422dd932dc1d5823942ee002799f
         with:
           ruby-version: '3.4.2'
           bundler-cache: true
           
       - name: Install dependencies
+        if: steps.setup-ruby.outputs.cache-hit != 'true'
         run: |
           gem install bundler
           bundle install --jobs 4 --retry 3
@@ -37,9 +39,18 @@ jobs:
         uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
         with:
           node-version: 22.14.0
-          cache: 'npm'
+
+      - name: Cache npm global packages
+        id: cache-npm-global
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-global-${{ hashFiles('**/package-lock.json') || github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-npm-global-
 
       - name: Install Wrangler
+        if: steps.cache-npm-global.outputs.cache-hit != 'true'
         run: npm install -g wrangler
 
       - name: Build site
@@ -68,9 +79,18 @@ jobs:
         uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
         with:
           node-version: 22.14.0
-          cache: 'npm'
           
+      - name: Cache npm global packages
+        id: cache-npm-global
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-global-${{ hashFiles('**/package-lock.json') || github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-npm-global-
+
       - name: Install Wrangler
+        if: steps.cache-npm-global.outputs.cache-hit != 'true'
         run: npm install -g wrangler
 
       - name: Publish
