@@ -44,7 +44,8 @@ jobs:
 
       - name: Build site
         run: |
-          bundle exec jekyll build -d /site/build
+          bundle exec jekyll build
+        working-directory: ./site
 
       - name: Publish
         uses: cloudflare/wrangler-action@v3.14.1
