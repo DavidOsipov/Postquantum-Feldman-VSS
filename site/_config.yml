@@ -84,6 +84,9 @@ relative_links:
     - "../docs"
     - ".."
 
+# Explicitly set layouts directory
+layouts_dir: site/_layouts
+
 # Exclude from processing
 exclude:
   - Gemfile
@@ -102,7 +105,7 @@ defaults:
       image: /assets/default-social-image.png
 
 # Base URL
-baseurl: "https://postquantum-feldman-vss.david-osipov.vision"
+baseurl: ""
 url: "https://postquantum-feldman-vss.david-osipov.vision"
 
 # Destination directory
