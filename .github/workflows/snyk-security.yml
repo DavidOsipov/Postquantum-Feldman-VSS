@@ -49,9 +49,7 @@ jobs:
           python-version: '3.13.2'
 
       - name: Create Sarif file's dir
-        run: |
-          mkdir sarif
-          mkdir safir/merged
+        run: mkdir sarif
           
       - name: Install dependencies
         run: |
