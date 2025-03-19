@@ -40,7 +40,7 @@ jobs:
         working-directory: site
 
       - name: Publish
-        uses: cloudflare/wrangler-action@cd6314a97b09d9a764e30cacd0870edc86f92986
+        uses: cloudflare/wrangler-action@707f63750981584eb6abc365a50d441516fb04b8
         with:
           apiToken: ${{ secrets.CLOUDFLARE_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
