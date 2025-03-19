@@ -32,7 +32,7 @@ jobs:
         run: |
           gem install bundler
           bundle install
-        working-directory: site
+        working-directory: ./site
 
       - name: Build site
         working-directory: ./site
@@ -53,6 +53,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          command: pages deploy site/_site --project-name=postquantum-feldman-vss
+          command: pages deploy site/build --project-name=postquantum-feldman-vss
         env:
           NODE_VERSION: 20.19.0
