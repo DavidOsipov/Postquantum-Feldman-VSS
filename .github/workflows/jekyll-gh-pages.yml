@@ -45,7 +45,7 @@ jobs:
           node-version: 20.19.0
           
       - name: Install Wrangler
-        run: npm install -g wrangler@3.90.0
+        run: npm install -g wrangler
 
       - name: Publish
         uses: cloudflare/wrangler-action@v3.14.1
@@ -56,4 +56,3 @@ jobs:
           command: pages deploy site/_site --project-name=postquantum-feldman-vss
         env:
           NODE_VERSION: 20.19.0
-          WRANGLER_VERSION: 3.90.0
