@@ -48,7 +48,7 @@ jobs:
         working-directory: ./site
         
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@65462800fd760540d3fbdee4b866aeacb711f890
         with:
           name: site-build
           path: site/build
@@ -59,7 +59,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@65a5b627b9257027a20beb016969dd9116e5480d
         with:
           name: site-build
           path: site/build
