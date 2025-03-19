@@ -1,5 +1,5 @@
 ---
-layout: libdoc/page
+layout: default
 ---
 
 # PostQuantum-Feldman-VSS

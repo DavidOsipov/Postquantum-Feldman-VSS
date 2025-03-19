@@ -88,9 +88,9 @@ relative_links:
 layouts_dir: site/_layouts
 
 # Remote theme settings
-remote_theme: olivier3lanc/Jekyll-LibDoc
-plugins:
-  - jekyll-remote-theme
+# remote_theme: olivier3lanc/Jekyll-LibDoc
+# plugins:
+#  - jekyll-remote-theme
 
 # Exclude from processing
 exclude:
