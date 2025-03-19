@@ -1,7 +1,7 @@
 """
 Post-Quantum Secure Feldman's Verifiable Secret Sharing (VSS) Implementation
 
-Version 0.8.0b3
+Version 0.8.1b0
 Developed in 2025 by David Osipov
 Licensed under the MIT License
 
@@ -202,16 +202,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("feldman_vss")
 
-# Version of the Script
-__version__ = "0.8.0b3"
+# Version of the Library
+__version__ = "0.8.1b0"
 
-#
+
 # The above code is defining the `__all__` list in a Python module. This list specifies the names of
-# the symbols that should be exported when using the `from module import *` syntax. In this case, it
-# includes various classes, functions, and exceptions such as `FeldmanVSS`, `VSSConfig`,
-# `get_feldman_vss`, `create_vss_from_shamir`, `integrate_with_pedersen`,
-# `create_dual_commitment_proof`, `verify_dual_commitments`, `SerializationError`, `SecurityError`,
-# `VerificationError`, and `ParameterError
+# the symbols that should be exported when using the `from module import *` syntax.
 __all__ = [
     "FeldmanVSS",
     "VSSConfig",
@@ -223,7 +219,41 @@ __all__ = [
     "SerializationError",
     "SecurityError",
     "VerificationError",
-    "ParameterError"
+    "ParameterError",
+    "CyclicGroup",
+    "SafeLRUCache",
+    "MemoryMonitor",
+    "constant_time_compare",
+    "validate_timestamp",
+    "estimate_mpz_size",
+    "estimate_mpz_operation_memory",
+    "estimate_exp_result_size",
+    "get_system_memory",
+    "check_memory_safety",
+    "compute_checksum",
+    "secure_redundant_execution",
+    "SecurityWarning",
+    "EvidenceEntryDict",
+    "ByzantineEvidenceDict",
+    "FieldElement",
+    "SharePoint",
+    "ShareDict",
+    "Randomizer",
+    "InvalidityProofDict",
+    "VerificationSummaryDict",
+    "VerificationDataDict",
+    "MemoryUsageStatsDict",
+    "ForensicDataDict",
+    "ByzantineDetectionResultDict",
+    "DualCommitmentProofDict",
+    "IntegrationResultDict",
+    "HashFunc",
+    "RedundantExecutorFunc",
+    "HashCommitment",
+    "CommitmentList",
+    "ProofDict",
+    "VerificationResult",
+    "RefreshingResult"
 ]
 # Security parameters
 VSS_VERSION = f"VSS-{__version__}"
