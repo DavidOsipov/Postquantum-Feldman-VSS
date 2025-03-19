@@ -36,26 +36,15 @@ shares = create_shares(secret, total_shares, threshold)
 secret = reconstruct_secret(shares)
 ```
 
-## Frequently Asked Questions
+## Documentation & Resources
 
-Please see the [FAQ](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/blob/main/docs/FAQ.md) for common questions and answers.
+- [Detailed Documentation](/docs/DOCUMENTATION)
+- [Frequently Asked Questions](/docs/FAQ)
+- [Security Policy](/SECURITY)
+- [Code of Conduct](/CODE_OF_CONDUCT)
+- [Contributing Guide](/CONTRIBUTING)
+- [License](/LICENSE)
 
-## Security
+## View on GitHub
 
-For security information, please refer to our [Security Policy](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/blob/main/SECURITY.md).
-
-## Code of Conduct
-
-Please review our [Code of Conduct](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/blob/main/CODE_OF_CONDUCT.md).
-
-## Contributing
-
-We welcome contributions! See our [Contributing Guide](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/blob/main/CONTRIBUTING.md).
-
-## Documentation
-
-For detailed documentation, please visit our [Documentation](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/blob/main/docs/DOCUMENTATION.md).
-
-## License
-
-This project is licensed under the terms found in the [LICENSE](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/blob/main/LICENSE) file.
+The complete source code is available on [GitHub](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS).

@@ -1,3 +1,8 @@
+---
+layout: default
+title: Documentation
+---
+
 # PostQuantum-Feldman-VSS API Reference (Version 0.8.1b0)
 
 This document provides a detailed API reference for the `PostQuantum-Feldman-VSS` library, a Python implementation of Feldman's Verifiable Secret Sharing (VSS) scheme designed for post-quantum security.  It covers all public classes and methods, including parameters, return types, descriptions, examples, and security considerations.

@@ -7,6 +7,7 @@ theme: minima  # Or jekyll-theme-minimal, or another supported theme
 markdown: kramdown
 plugins:
   - jekyll-relative-links
+  - jekyll-include-cache
 
 # Process these files as Jekyll files
 include:
@@ -36,7 +37,14 @@ defaults:
 
 # Base URL
 baseurl: ""
+url: "https://postquantum-feldman-vss.david-osipov.vision"
 
-# Add this section to properly handle content from parent directories
+# Destination directory
+destination: ./build
+
+# Include files from outside site directory
 include_relative:
   enabled: true
+  paths:
+    - "../docs"
+    - ".."

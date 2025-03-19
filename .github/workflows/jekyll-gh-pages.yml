@@ -35,9 +35,9 @@ jobs:
         working-directory: site
 
       - name: Build site
+        working-directory: ./site
         run: |
-          bundle exec jekyll build
-        working-directory: site
+          bundle exec jekyll build -d ./build
 
       - name: Install Node.js
         uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e

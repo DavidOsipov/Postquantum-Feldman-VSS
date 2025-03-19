@@ -6,6 +6,7 @@ gem "minima", "~> 2.5"  # Theme specified in your _config.yml
 # Plugins
 gem "jekyll-relative-links", "~> 0.7.0"
 gem "jekyll-include-cache", "~> 0.2.1" # Optional: Improves build performance
+gem "jekyll-redirect-from", "~> 0.16.0" # For redirects if needed
 
 # Windows and JRuby does not include zoneinfo files, so bundle the tzinfo-data gem
 # and associated library.
