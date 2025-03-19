@@ -36,3 +36,7 @@ defaults:
 
 # Base URL
 baseurl: ""
+
+# Add this section to properly handle content from parent directories
+include_relative:
+  enabled: true
