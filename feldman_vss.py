@@ -143,6 +143,15 @@ Developer: David Osipov
 # mypy: disallow-incomplete-defs=False
 # pyright: reportOptionalMemberAccess=false
 
+import hashlib
+import logging
+import random
+import secrets
+import threading
+import time
+import traceback
+import warnings
+import importlib.util
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from collections import OrderedDict
 from typing import (
@@ -151,30 +160,7 @@ from typing import (
     Literal
 )
 from dataclasses import dataclass
-import hashlib
-import importlib.util
-import logging
-import random
-import secrets
-import threading
-import time
-import warnings
-
-# Initialize blake3 to None
-blake3 = None
-
-# Check if blake3 is available
-has_blake3 = importlib.util.find_spec("blake3") is not None
-if has_blake3:
-    try:
-        import blake3
-    except ImportError:
-        has_blake3 = False
-        warnings.warn(
-            "BLAKE3 library not found. Falling back to SHA3-256. "
-            "Install BLAKE3 with: pip install blake3",
-            ImportWarning,
-        )
+import msgpack
 
 # Import BLAKE3 for cryptographic hashing (faster and more secure than SHA3-256)
 
@@ -203,6 +189,11 @@ except ImportError as exc:
         "Install gmpy2 with: pip install gmpy2"
     ) from exc
 
+# Import psutil for memory monitoring if available
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -211,8 +202,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger("feldman_vss")
 
+# Version of the Script
+__version__ = "0.8.0b3"
+
+#
+# The above code is defining the `__all__` list in a Python module. This list specifies the names of
+# the symbols that should be exported when using the `from module import *` syntax. In this case, it
+# includes various classes, functions, and exceptions such as `FeldmanVSS`, `VSSConfig`,
+# `get_feldman_vss`, `create_vss_from_shamir`, `integrate_with_pedersen`,
+# `create_dual_commitment_proof`, `verify_dual_commitments`, `SerializationError`, `SecurityError`,
+# `VerificationError`, and `ParameterError
+__all__ = [
+    "FeldmanVSS",
+    "VSSConfig",
+    "get_feldman_vss",
+    "create_vss_from_shamir",
+    "integrate_with_pedersen",
+    "create_dual_commitment_proof",
+    "verify_dual_commitments",
+    "SerializationError",
+    "SecurityError",
+    "VerificationError",
+    "ParameterError"
+]
 # Security parameters
-VSS_VERSION = "VSS-0.8.0b3"
+VSS_VERSION = f"VSS-{__version__}"
 # Minimum size for secure prime fields for post-quantum security
 MIN_PRIME_BITS = 4096
 MAX_TIME_DRIFT = 3600  # Maximum allowed timestamp drift in seconds (1 hour)
@@ -2466,7 +2480,7 @@ class FeldmanVSS:
         if extra_entropy is not None and not isinstance(extra_entropy, bytes):
             raise TypeError("extra_entropy must be bytes if provided")
 
-        # Convert inputs to mpz to ensure consistent handling
+        # Normalize inputs
         value_mpz: "gmpy2.mpz" = gmpy2.mpz(value)
         randomizer_mpz: "gmpy2.mpz" = gmpy2.mpz(randomizer)
 
@@ -2601,7 +2615,7 @@ class FeldmanVSS:
 
     def _verify_hash_based_commitment(
         self,
-        value: Union[int, "gmpy2.mpz"],  # Improved type annotation
+        value: Union[int, "gmpy2.mpz"],
         combined_randomizer: Union[int, "gmpy2.mpz"],
         x: Union[int, "gmpy2.mpz"],
         expected_commitment: Union[int, "gmpy2.mpz"],
@@ -2632,12 +2646,16 @@ class FeldmanVSS:
             bool: True if verification succeeds, False otherwise.
         """
         # Compute the hash commitment
-        computed_commitment: Union[int, "gmpy2.mpz"] = self._compute_hash_commitment(
-            value, combined_randomizer, x, context, extra_entropy
-        )
+        try:
+            computed_commitment: Union[int, "gmpy2.mpz"] = self._compute_hash_commitment(
+                value, combined_randomizer, x, context, extra_entropy
+            )
 
-        # Compare with expected commitment using constant-time comparison
-        return constant_time_compare(computed_commitment, expected_commitment)
+            # Compare with expected commitment using constant-time comparison
+            return constant_time_compare(computed_commitment, expected_commitment)
+        except Exception:
+            # If any error occurs during verification, return False for safety
+            return False
 
     def create_commitments(self, coefficients: List[FieldElement], context: Optional[str] = None) -> CommitmentList:
         """
@@ -2800,32 +2818,32 @@ class FeldmanVSS:
         """
         # Input validation
         if not isinstance(share_x, (int, gmpy2.mpz)):
-            raise TypeError("share_x must be an integer")
-        if not isinstaraise TypeError("share_x must be an integer") (int, gmpy2.mpz)):
-            raise TypeError("share_y must be an integer")
+            return False
+        if not isinstance(share_y, (int, gmpy2.mpz)):
+            return False
         if not isinstance(commitments, list) or not commitments:
-            raise TypeError("commitments must be a non-empty list")
+            return False
 
-        # Validate craise TypeError("commitments must be a non-empty list")rmat
+        # Validate commitment format
         if not all(isinstance(c, tuple) and len(c) >= 2 for c in commitments):
-            raise TypeError(
-                "commitments must be a list of (commitment, randomizer) tuples"
-            )
+            return False
 
-        # Convert toraise TypeError(
-                "commitments must be a list of (commitment, randomizer) tuples"
-            )d use redundant verification
-        x: "gmpy2.mpz"
-        y: "gmpy2.mpz"
-        x, y = gmpy2.mpz(share_x), gmpy2.mpz(share_y)
-        return secure_redundant_execution(
-            self._verify_share_hash_based_single,
-            x,
-            y,
-            commitments,
-            sanitize_error_func=self._sanitize_error,
-            function_name="verify_share",
-        )
+        # Convert to integers and use redundant verification
+        x: "gmpy2.mpz" = gmpy2.mpz(share_x)
+        y: "gmpy2.mpz" = gmpy2.mpz(share_y)
+        
+        try:
+            return secure_redundant_execution(
+                self._verify_share_hash_based_single,
+                x,
+                y,
+                commitments,
+                sanitize_error_func=self._sanitize_error,
+                function_name="verify_share",
+            )
+        except Exception:
+            # In case of any errors during verification, return False for safety
+            return False
 
     def batch_verify_shares(self, shares: List[SharePoint], commitments: CommitmentList) -> VerificationResult:
         """
@@ -2986,18 +3004,21 @@ class FeldmanVSS:
         }
 
         try:
-            # Pack with msgpack for efficient serialization
-            packed_data: bytes = msgpack.packb(result)
-
-            # Compute checksum and create wrapper
-            checksum_wrapper: Dict[str, bytes] = {
-                "data": packed_data,
-                "checksum": compute_checksum(packed_data),
-            }
-
-            # Pack the wrapper and encode
-            packed_wrapper: bytes = msgpack.packb(checksum_wrapper)
-            return urlsafe_b64encode(packed_wrapper).decode("utf-8")
+            # Create a serialization-safe representation
+            # Convert to bytes for consistent cross-platform serialization
+            data_bytes: bytes = msgpack.packb(result, use_bin_type=True)
+            
+            # Computer checksum
+            checksum: int = compute_checksum(data_bytes)
+            
+            # Add checksum to original data
+            result["checksum"] = checksum
+            
+            # Now pack again with the checksum included
+            final_data: bytes = msgpack.packb(result, use_bin_type=True)
+            
+            # Return base64-encoded result for safe transport
+            return urlsafe_b64encode(final_data).decode("utf-8")
         except Exception as e:
             detailed_msg = f"Failed to serialize commitments: {e}"
             message = "Serialization failed"
