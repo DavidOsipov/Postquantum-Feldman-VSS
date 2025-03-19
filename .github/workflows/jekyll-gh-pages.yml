@@ -17,7 +17,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
@@ -31,13 +30,14 @@ jobs:
       - name: Install dependencies
         run: |
           gem install bundler
-          bundle install
+          bundle install --jobs 4 --retry 3
         working-directory: ./site
 
       - name: Install Node.js
         uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
         with:
           node-version: 22.14.0
+          cache: 'npm'
 
       - name: Install Wrangler
         run: npm install -g wrangler
@@ -46,6 +46,32 @@ jobs:
         run: |
           bundle exec jekyll build --source $GITHUB_WORKSPACE --destination $GITHUB_WORKSPACE/site/build --config $GITHUB_WORKSPACE/site/_config.yml
         working-directory: ./site
+        
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: site-build
+          path: site/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: site-build
+          path: site/build
+
+      - name: Install Node.js
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
+        with:
+          node-version: 22.14.0
+          cache: 'npm'
+          
+      - name: Install Wrangler
+        run: npm install -g wrangler
 
       - name: Publish
         uses: cloudflare/wrangler-action@v3.14.1
