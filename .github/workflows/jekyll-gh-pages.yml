@@ -45,4 +45,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          command: pages deploy .github/_site --project-name=postquantum-feldman-vss
+          command: pages deploy site/_site --project-name=postquantum-feldman-vss
