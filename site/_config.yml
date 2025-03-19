@@ -1,5 +1,5 @@
 # Jekyll configuration for GitHub Pages
-title: PostQuantum-Feldman-VSS
+title: Post-Quantum Feldman's VSS
 description: Post-Quantum Secure Feldman's Verifiable Secret Sharing
 tagline: A Python implementation of Feldman's Verifiable Secret Sharing designed to be secure against quantum computers
 theme: minima  # Or jekyll-theme-minimal, or another supported theme
@@ -86,6 +86,11 @@ relative_links:
 
 # Explicitly set layouts directory
 layouts_dir: site/_layouts
+
+# Remote theme settings
+remote_theme: olivier3lanc/Jekyll-LibDoc
+plugins:
+  - jekyll-remote-theme
 
 # Exclude from processing
 exclude:

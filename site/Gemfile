@@ -1,7 +1,8 @@
 source "https://rubygems.org"
 
 gem "jekyll", "~> 4.4.0"
-gem "minima", "~> 2.5"  # Theme specified in your _config.yml
+#gem "minima", "~> 2.5"  # Theme specified in your _config.yml
+gem "jekyll-remote-theme"
 
 # Plugins
 gem "jekyll-relative-links", "~> 0.7.0"
