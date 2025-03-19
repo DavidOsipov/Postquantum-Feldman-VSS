@@ -39,6 +39,14 @@ jobs:
           bundle exec jekyll build
         working-directory: site
 
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.19.0
+          
+      - name: Install Wrangler
+        run: npm install -g wrangler@3.90.0
+
       - name: Publish
         uses: cloudflare/wrangler-action@v3.14.1
         with:
