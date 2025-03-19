@@ -156,6 +156,7 @@ from collections import OrderedDict
 from typing import (
     Any, Dict, List, Tuple, Optional, Union,
     Callable, TypeVar, Generic, NoReturn, Type, Set, TypedDict,
+    Literal
 )
 from dataclasses import dataclass
 import msgpack
@@ -193,6 +194,7 @@ logger = logging.getLogger("feldman_vss")
 VSS_VERSION = "VSS-0.8.0b3"
 # Minimum size for secure prime fields for post-quantum security
 MIN_PRIME_BITS = 4096
+MAX_TIME_DRIFT = 3600  # Maximum allowed timestamp drift in seconds (1 hour)
 
 # Safe primes cache - these are primes p where (p-1)/2 is also prime
 # Using larger primes for post-quantum security
@@ -218,16 +220,26 @@ SAFE_PRIMES = {
 
 
 # Type definitions
+# More specific TypedDict definitions for nested structures
+EvidenceEntryDict = TypedDict('EvidenceEntryDict', {
+    'party_id': int,
+    'action': str,
+    'data': Dict[str, Union[int, str, bool]],
+    'timestamp': int
+})
+
 ByzantineEvidenceDict = TypedDict('ByzantineEvidenceDict', {
     'type': str,
-    'evidence': List[Dict[str, Any]],
+    'evidence': List[EvidenceEntryDict],
     'timestamp': int,
     'signature': str
 })
+
 FieldElement = Union[int, "gmpy2.mpz"]  # Integer field elements
 SharePoint = Tuple[FieldElement, FieldElement]  # (x, y) coordinate
 ShareDict = Dict[int, SharePoint]  # Maps participant ID to share
 Randomizer = FieldElement  # Randomizer values for commitments
+
 InvalidityProofDict = TypedDict('InvalidityProofDict', {
     'party_id': int,
     'participant_id': int,
@@ -239,6 +251,17 @@ InvalidityProofDict = TypedDict('InvalidityProofDict', {
     'timestamp': int,
     'signature': str
 })
+
+VerificationSummaryDict = TypedDict('VerificationSummaryDict', {
+    'total_zero_shares_created': int,
+    'total_zero_shares_verified': int,
+    'invalid_shares_detected': Dict[int, List[int]],
+    'participants_with_full_verification': int,
+    'potential_collusion_detected': bool,
+    'byzantine_parties_excluded': int,
+    'byzantine_party_ids': List[int]
+})
+
 VerificationDataDict = TypedDict('VerificationDataDict', {
     'original_shares_count': int,
     'threshold': int,
@@ -247,12 +270,14 @@ VerificationDataDict = TypedDict('VerificationDataDict', {
     'protocol': str,
     'verification_method': str,
     'hash_based': bool,
-    'verification_summary': Dict[str, Any],
+    'verification_summary': VerificationSummaryDict,
     'seed_fingerprint': str,
     'verification_proofs': Dict[int, Dict[int, Any]]
 })
+
 HashCommitment = Tuple[FieldElement, Randomizer, Optional[bytes]]  # (hash, randomizer, entropy)
 CommitmentList = List[HashCommitment]  # List of commitments
+
 ProofDict = TypedDict('ProofDict', {
     'blinding_commitments': List[Tuple[FieldElement, FieldElement]],
     'challenge': FieldElement,
@@ -261,12 +286,9 @@ ProofDict = TypedDict('ProofDict', {
     'blinding_randomizers': List[FieldElement],
     'timestamp': int
 })
+
 VerificationResult = Tuple[bool, Dict[int, bool]]
 RefreshingResult = Tuple[ShareDict, CommitmentList, Dict[str, Any]]
-
-# Type Aliases for Complex Types
-HashFunc = Callable[[bytes], Any]
-RedundantExecutorFunc = Callable[..., Any]
 
 # Type Aliases for Complex Types
 HashFunc = Callable[[bytes], Any]
@@ -290,7 +312,12 @@ class SecurityError(Exception):
         self.message = message
         self.detailed_info = detailed_info
         self.severity = severity
+        
+        # Validate timestamp
+        if timestamp is not None and not isinstance(timestamp, int):
+            raise TypeError("timestamp must be an integer or None")
         self.timestamp = timestamp or int(time.time())
+        
         super().__init__(message)
 class SerializationError(Exception):
     """
@@ -304,22 +331,52 @@ class SerializationError(Exception):
         self.message = message
         self.detailed_info = detailed_info
         self.severity = severity
+        
+        # Validate timestamp
+        if timestamp is not None and not isinstance(timestamp, int):
+            raise TypeError("timestamp must be an integer or None")
         self.timestamp = timestamp or int(time.time())
+        
         self.data_format = data_format  # Stores format information about the serialized data
         self.checksum_info = checksum_info  # Stores checksum validation details if applicable
         super().__init__(message)
         
-    def get_forensic_data(self) -> Dict[str, Any]:
-        """Return all forensic information as a dictionary for logging or analysis"""
-        return {
+    def get_forensic_data(self, detail_level: Literal['low', 'medium', 'high'] = 'medium') -> Dict[str, Any]:
+        """
+        Return all forensic information as a dictionary for logging or analysis
+        
+        Arguments:
+            detail_level (str): Level of detail to include ('low', 'medium', 'high')
+            
+        Returns:
+            Dict[str, Any]: Dictionary with forensic information
+        """
+        # Base data always included
+        result = {
             "message": self.message,
-            "detailed_info": self.detailed_info,
             "severity": self.severity,
             "timestamp": self.timestamp,
-            "data_format": self.data_format,
-            "checksum_info": self.checksum_info,
             "error_type": "SerializationError"
         }
+        
+        # Add more details based on detail_level
+        if detail_level in ('medium', 'high'):
+            result["detailed_info"] = self.detailed_info
+            result["data_format"] = self.data_format
+            
+        if detail_level == 'high':
+            # Include potentially sensitive checksum information only at high detail level
+            if self.checksum_info:
+                # Convert any complex objects to strings for safe serialization
+                safe_checksum_info = {}
+                for k, v in self.checksum_info.items():
+                    if isinstance(v, (int, str, bool, float, type(None))):
+                        safe_checksum_info[k] = v
+                    else:
+                        safe_checksum_info[k] = str(v)
+                result["checksum_info"] = safe_checksum_info
+        
+        return result
 
 class VerificationError(Exception):
     """
@@ -334,22 +391,44 @@ class VerificationError(Exception):
         self.message = message
         self.detailed_info = detailed_info
         self.severity = severity
-        self.timestamp = timestamp or int(time.time())
+        
+        # Use the centralized timestamp validation function
+        self.timestamp = validate_timestamp(timestamp)
+        
         self.share_info = share_info  # Information about the share that failed verification
         self.commitment_info = commitment_info  # Information about the commitments used
         super().__init__(message)
         
-    def get_forensic_data(self) -> Dict[str, Any]:
-        """Return all forensic information as a dictionary for logging or analysis"""
-        return {
+    def get_forensic_data(self, detail_level: Literal['low', 'medium', 'high'] = 'medium') -> Dict[str, Any]:
+        """
+        Return all forensic information as a dictionary for logging or analysis
+        
+        Arguments:
+            detail_level (str): Level of detail to include ('low', 'medium', 'high')
+            
+        Returns:
+            Dict[str, Any]: Dictionary with forensic information
+        """
+        # Base data always included
+        result = {
             "message": self.message,
-            "detailed_info": self.detailed_info,
             "severity": self.severity,
             "timestamp": self.timestamp,
-            "share_info": self.share_info,
-            "commitment_info": self.commitment_info,
             "error_type": "VerificationError"
         }
+        
+        # Add more details based on detail_level
+        if detail_level in ('medium', 'high'):
+            if self.detailed_info:
+                result["detailed_info"] = self.detailed_info
+            
+        if detail_level == 'high':
+            if self.share_info:
+                result["share_info"] = self.share_info
+            if self.commitment_info:
+                result["commitment_info"] = self.commitment_info
+        
+        return result
 
 
 class ParameterError(Exception):
@@ -366,24 +445,50 @@ class ParameterError(Exception):
         self.message = message
         self.detailed_info = detailed_info
         self.severity = severity
+        
+        # Validate timestamp
+        if timestamp is not None and not isinstance(timestamp, int):
+            raise TypeError("timestamp must be an integer or None")
         self.timestamp = timestamp or int(time.time())
+        
         self.parameter_name = parameter_name  # Name of the invalid parameter
         self.parameter_value = parameter_value  # Value of the invalid parameter
         self.expected_type = expected_type  # Expected type or value range
         super().__init__(message)
         
-    def get_forensic_data(self) -> Dict[str, Any]:
-        """Return all forensic information as a dictionary for logging or analysis"""
-        return {
+    def get_forensic_data(self, detail_level: Literal['low', 'medium', 'high'] = 'medium') -> Dict[str, Any]:
+        """
+        Return all forensic information as a dictionary for logging or analysis
+        
+        Arguments:
+            detail_level (str): Level of detail to include ('low', 'medium', 'high')
+            
+        Returns:
+            Dict[str, Any]: Dictionary with forensic information
+        """
+        # Base data always included
+        result = {
             "message": self.message,
-            "detailed_info": self.detailed_info,
             "severity": self.severity,
             "timestamp": self.timestamp,
-            "parameter_name": self.parameter_name,
-            "parameter_value": str(self.parameter_value),  # Convert to string to ensure serialization
-            "expected_type": self.expected_type,
             "error_type": "ParameterError"
         }
+        
+        # Add more details based on detail_level
+        if detail_level in ('medium', 'high'):
+            result["detailed_info"] = self.detailed_info
+            result["parameter_name"] = self.parameter_name
+            result["expected_type"] = self.expected_type
+            
+        if detail_level == 'high':
+            # Convert parameter value to string at high detail level to ensure safe serialization
+            if self.parameter_value is not None:
+                if isinstance(self.parameter_value, (int, str, bool, float)):
+                    result["parameter_value"] = self.parameter_value
+                else:
+                    result["parameter_value"] = str(self.parameter_value)
+        
+        return result
 
 @dataclass
 class VSSConfig:
@@ -514,10 +619,6 @@ class SafeLRUCache(Generic[K, V]):
 
 
 # --- HELPER FUNCTIONS ---
-
-HashFunc = Callable[[bytes], Any]
-RedundantExecutorFunc = Callable[..., Any]
-
 def constant_time_compare(a: Union[int, str, bytes], b: Union[int, str, bytes]) -> bool:
     """
     Description:
@@ -578,7 +679,55 @@ def constant_time_compare(a: Union[int, str, bytes], b: Union[int, str, bytes]) 
     # Final result is 0 only if all bytes matched
     return result == 0
 
-
+def validate_timestamp(timestamp: Optional[int], max_future_drift: int = MAX_TIME_DRIFT,
+                   min_past_drift: int = 86400, allow_none: bool = True) -> int:
+    """
+    Validate a timestamp value with comprehensive checks for security-sensitive operations.
+    
+    Args:
+        timestamp: Timestamp to validate (seconds since epoch)
+        max_future_drift: Maximum allowed future drift in seconds (default: MAX_TIME_DRIFT constant)
+        min_past_drift: Maximum allowed past drift in seconds (default: 24 hours/86400 seconds)
+        allow_none: Whether to allow None values and replace with current time
+    
+    Returns:
+        int: The validated timestamp or current time if timestamp was None and allow_none=True
+        
+    Raises:
+        TypeError: If timestamp is not an integer or None when allow_none=True
+        ValueError: If timestamp is negative or outside acceptable drift ranges
+    """
+    # Return current time for None if allowed
+    if timestamp is None:
+        if allow_none:
+            return int(time.time())
+        raise TypeError("timestamp cannot be None when allow_none=False")
+    
+    # Type checking
+    if not isinstance(timestamp, int):
+        raise TypeError("timestamp must be an integer")
+    
+    # Negative timestamp check
+    if timestamp < 0:
+        raise ValueError("timestamp cannot be negative")
+    
+    current_time = int(time.time())
+    
+    # Future timestamp check
+    if timestamp > current_time + max_future_drift:
+        raise ValueError(f"timestamp cannot be more than {max_future_drift} seconds in the future")
+        
+    # Past timestamp check (prevent replay attacks)
+    if timestamp < current_time - min_past_drift:
+        raise ValueError(f"timestamp cannot be more than {min_past_drift} seconds in the past")
+        
+    # Log significant time differences (half of max_future_drift)
+    if abs(timestamp - current_time) > max_future_drift / 2:
+        warnings.warn(f"Significant time difference detected: {timestamp - current_time} seconds", SecurityWarning)
+        
+    return timestamp
+        
+        
 def estimate_mpz_size(n: Union[int, "gmpy2.mpz"]) -> int:
     """
     Estimate memory required for a gmpy2.mpz number of given bit length.
