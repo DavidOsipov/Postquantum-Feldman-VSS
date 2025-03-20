@@ -747,7 +747,7 @@ class SafeLRUCache(Generic[K, V]):
 
 
 # --- HELPER FUNCTIONS ---
-def constant_time_compare(a: Union[int, str, bytes], b: Union[int, str, bytes]) -> bool:
+def constant_time_compare(a: Union[int, str, bytes, "gmpy2.mpz"], b: Union[int, str, bytes, "gmpy2.mpz"]) -> bool:
     """
     Description:
         Compare two values in constant time to prevent timing attacks.
