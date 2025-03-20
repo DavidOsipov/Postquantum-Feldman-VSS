@@ -130,7 +130,7 @@ Developer: David Osipov
     """
 
 # /// script
-# requires-python = ">=3.9"
+# requires-python = ">=3.10"
 # dependencies = [
 #   "gmpy2 == 2.2.1",
 #   "msgpack == 1.1.0",
@@ -157,7 +157,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from typing import (
     Any, TypeVar, Generic, NoReturn, TypedDict,
-    Literal, Union, Optional, List, Tuple, Dict
+    Literal, Union, Optional, List, Tuple, Dict, Set, cast
 )
 from dataclasses import dataclass
 import msgpack
@@ -300,7 +300,7 @@ ByzantineEvidenceDict = TypedDict('ByzantineEvidenceDict', {
     'signature': str
 })
 
-FieldElement = Union[int, "gmpy2.mpz"]  # Integer field elements
+FieldElement = Union[int, "gmpy2.mpz"]  # Ensure only int and gmpy2.mpz are allowed.
 SharePoint = tuple[FieldElement, FieldElement]  # (x, y) coordinate
 ShareDict = dict[int, SharePoint]  # Maps participant ID to share
 Randomizer = FieldElement  # Randomizer values for commitments
@@ -1176,6 +1176,13 @@ def check_memory_safety(operation: str, *args: Any, max_size_mb: int = 1024, rej
                 )
                 return False
                 
+            # Return the result of the memory check
+            return estimated_bytes <= max_bytes
+    except Exception as e:
+        # Log the error and return False for any exception
+        logger.error(msg=f"Error in memory safety check for operation '{operation}': {str(object=e)}")
+        return False
+                
 def compute_checksum(data: bytes) -> int:
     """
     Description:
@@ -1204,7 +1211,7 @@ def compute_checksum(data: bytes) -> int:
 
 
 def secure_redundant_execution(
-    func: RedundantExecutorFunc,
+    func: Callable[..., Any],
     *args: Any,
     sanitize_error_func: Optional[Callable[[str, Optional[str]], str]] = None,
     function_name: Optional[str] = None,
@@ -1323,11 +1330,14 @@ def secure_redundant_execution(
                         # For complex objects, use serialization with fallbacks
                         try:
                             # Use the already-imported msgpack
-                            serialized_i: bytes = msgpack.packb(results[i], use_bin_type=True)
-                            serialized_j: bytes = msgpack.packb(results[j], use_bin_type=True)
-                            result_match = constant_time_compare(
-                                serialized_i, serialized_j
-                            )
+                            serialized_i = msgpack.packb(results[i], use_bin_type=True)
+                            serialized_j = msgpack.packb(results[j], use_bin_type=True)
+                            if not (isinstance(serialized_i, bytes) and isinstance(serialized_j, bytes)):
+                                result_match = False
+                            else:
+                                result_match = constant_time_compare(
+                                    serialized_i, serialized_j
+                                )
                             valid &= result_match
                             if not result_match:
                                 mismatch_details.append(f"Results {i} and {j} differ")
@@ -2511,7 +2521,10 @@ class FeldmanVSS:
             raise TypeError("extra_entropy must be bytes if provided")
 
         # Normalize inputs
-        value_mpz: "gmpy2.mpz" = gmpy2.mpz(value)
+        if isinstance(value, (int, gmpy2.mpz)):
+            value_mpz: Union[int, gmpy2.mpz] = gmpy2.mpz(value)
+        else:
+            raise TypeError("value must be of type int or gmpy2.mpz")
         randomizer_mpz: "gmpy2.mpz" = gmpy2.mpz(randomizer)
 
         # Calculate byte length based on prime size
