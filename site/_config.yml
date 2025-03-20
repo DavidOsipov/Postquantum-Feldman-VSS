@@ -99,6 +99,18 @@ exclude:
   - node_modules
   - vendor
   - .sass-cache
+  - "*.py"
+  - "*.pyi"
+  - "pyproject.toml"
+  - "renovate.json"
+  - "typings/"
+  - "assets/source/"
+  - ".github/"
+  - ".git/"
+  - "*.zip"
+  - "*.log"
+  - "package.json"
+  - "package-lock.json"
 
 # Set default layout for all pages
 defaults:
@@ -122,3 +134,12 @@ include_relative:
   paths:
     - "../docs"
     - ".."
+  exclude:
+    - "../*.py"
+    - "../*.pyi"
+    - "../pyproject.toml"
+    - "../renovate.json"
+    - "../typings/"
+    - "../.github/"
+    - "../.git/"
+    - "../LICENSE"

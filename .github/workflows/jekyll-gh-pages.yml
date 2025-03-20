@@ -49,13 +49,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-npm-global-
 
+      - name: Debug cache outputs
+        run: echo "Cache hit is ${{ steps.cache-npm-global.outputs.cache-hit }}"
+
       - name: Install Wrangler
         if: steps.cache-npm-global.outputs.cache-hit != 'true'
         run: npm install -g wrangler
 
       - name: Build site
         run: |
-          bundle exec jekyll build --source $GITHUB_WORKSPACE --destination $GITHUB_WORKSPACE/site/build --config $GITHUB_WORKSPACE/site/_config.yml
+          bundle exec jekyll build --source $GITHUB_WORKSPACE --destination $GITHUB_WORKSPACE/site/build --config $GITHUB_WORKSPACE/site/_config.yml --verbose
         working-directory: ./site
         
       - name: Upload build artifacts
@@ -63,6 +66,7 @@ jobs:
         with:
           name: site-build
           path: site/build
+          if-no-files-found: error
 
   deploy:
     needs: build
