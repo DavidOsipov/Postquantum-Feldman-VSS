@@ -1,7 +1,7 @@
 """
 Post-Quantum Secure Feldman's Verifiable Secret Sharing (VSS) Implementation
 
-Version 0.8.1b0
+Version 0.8.1b1
 Developed in 2025 by David Osipov
 Licensed under the MIT License
 
@@ -204,7 +204,7 @@ logging.basicConfig(
 logger = logging.getLogger("feldman_vss")
 
 # Version of the Library
-__version__ = "0.8.1b0"
+__version__ = "0.8.1b1"
 
 
 # The above code is defining the `__all__` list in a Python module. This list specifies the names of
@@ -756,47 +756,107 @@ def constant_time_compare(a: Union[int, str, bytes, "gmpy2.mpz"], b: Union[int, 
 
     Outputs:
         bool: True if values are equal, False otherwise.
+        
+    Security Notes:
+        - While this function aims to perform comparisons in constant time, Python's
+          inherent behavior means true constant-time operations cannot be guaranteed
+          at the CPU level.
+        - For critical security applications, consider using specialized cryptographic
+          libraries implemented in lower-level languages.
+        - This implementation provides reasonable protection against basic timing attacks
+          but should not be relied upon for defending against sophisticated side-channel
+          attacks where the attacker has access to precise timing measurements.
+    
+    Examples:
+        >>> constant_time_compare(1234, 1234)
+        True
+        >>> constant_time_compare(b"secret", b"secrat")
+        False
+        >>> constant_time_compare(gmpy2.mpz(101), 101)
+        True
     """
     # Input validation
+    if a is None or b is None:
+        return False
+
+    # Optimize for identical objects (safe shortcut that doesn't affect timing security)
+    if a is b:
+        return True
+        
+    # Normalize mpz types to int
     if isinstance(a, gmpy2.mpz):
         a = int(a)
     if isinstance(b, gmpy2.mpz):
         b = int(b)
         
     # Convert to bytes for consistent handling
-    if isinstance(a, int) and isinstance(b, int):
-        # For integers, ensure same bit length with padding
-        # Handle the case where a or b might be 0 (which doesn't have bit_length directly applicable)
-        a_bits = a.bit_length() if a != 0 and hasattr(a, 'bit_length') else 0
-        b_bits = b.bit_length() if b != 0 and hasattr(b, 'bit_length') else 0
-        bit_length: int = max(a_bits, b_bits, 8)  # Minimum 8 bits
-        byte_length: int = (bit_length + 7) // 8
-        a_bytes: bytes = a.to_bytes(byte_length, byteorder="big")
-        b_bytes: bytes = b.to_bytes(byte_length, byteorder="big")
-    elif isinstance(a, str) and isinstance(b, str):
-        a_bytes = a.encode("utf-8")
-        b_bytes = b.encode("utf-8")
-    elif isinstance(a, bytes) and isinstance(b, bytes):
-        a_bytes = a
-        b_bytes = b
-    else:
-        # For mixed types, use a consistent conversion approach
-        a_bytes = str(a).encode("utf-8")
-        b_bytes = str(b).encode("utf-8")
-
-    # Handle different lengths with a padded comparison
-    # to maintain constant time behavior
-    max_len: int = max(len(a_bytes), len(b_bytes))
-    a_bytes = a_bytes.ljust(max_len, b"\0")
-    b_bytes = b_bytes.ljust(max_len, b"\0")
-
-    # Constant-time comparison with the full length
-    result: int = 0
-    for x, y in zip(a_bytes, b_bytes):
-        result |= x ^ y
-
-    # Final result is 0 only if all bytes matched
-    return result == 0
+    try:
+        if isinstance(a, int) and isinstance(b, int):
+            # For integers, handle negative values securely
+            if (a < 0) != (b < 0):  # Different signs
+                return False
+                
+            # For integers, ensure same bit length with padding
+            a_bits: int = a.bit_length() if hasattr(a, "bit_length") and a != 0 else 0
+            b_bits: int = b.bit_length() if hasattr(b, "bit_length") and b != 0 else 0
+            
+            # Protect against DOS with excessive memory allocation
+            if max(a_bits, b_bits) > 1_000_000:  # Reasonable upper limit
+                raise ValueError("Integer values too large for secure comparison")
+                
+            bit_length: int = max(a_bits, b_bits, 8)  # Minimum 8 bits
+            byte_length: int = (bit_length + 7) // 8
+            
+            # Convert to bytes with same length
+            a_bytes: bytes = abs(a).to_bytes(byte_length, byteorder="big")
+            b_bytes: bytes = abs(b).to_bytes(byte_length, byteorder="big")
+            
+        elif isinstance(a, str) and isinstance(b, str):
+            a_bytes = a.encode(encoding="utf-8")
+            b_bytes = b.encode(encoding="utf-8")
+            
+        elif isinstance(a, bytes) and isinstance(b, bytes):
+            a_bytes = a
+            b_bytes = b
+            
+        else:
+            # For mixed types, use a consistent conversion approach
+            # Note: This branch is less secure for timing, but necessary for flexibility
+            a_bytes = str(a).encode(encoding="utf-8")
+            b_bytes = str(b).encode(encoding="utf-8")
+            
+        # Protect against DOS with excessive memory allocation
+        if max(len(a_bytes), len(b_bytes)) > 10_000_000:  # 10MB limit
+            raise ValueError("Input values too large for secure comparison")
+            
+        # Handle different lengths with a padded comparison
+        # to maintain constant time behavior
+        max_len: int = max(len(a_bytes), len(b_bytes))
+        a_bytes = a_bytes.ljust(max_len, b"\0")
+        b_bytes = b_bytes.ljust(max_len, b"\0")
+        
+        # Constant-time comparison with the full length
+        result: int = 0
+        
+        # Perform two passes to further mask timing differences
+        # First pass - standard XOR comparison
+        for x, y in zip(a_bytes, b_bytes):
+            result |= x ^ y
+            
+        # Redundant second pass to mask CPU-level optimizations and cache effects
+        # The 'dummy' variable is intentionally unused - its calculation serves
+        # to normalize execution time against sophisticated timing attacks
+        dummy: int = 0
+        for x, y in zip(a_bytes, b_bytes):
+            dummy |= x & y
+            
+        # Final result is 0 only if all bytes matched
+        return result == 0
+        
+    except (ValueError, TypeError, OverflowError) as e:
+        # Log error for debugging but maintain security by returning False
+        logger.debug(f"Error in constant_time_compare: {e}")
+        return False
 
 def validate_timestamp(timestamp: Optional[int], max_future_drift: int = MAX_TIME_DRIFT,
                    min_past_drift: int = 86400, allow_none: bool = True) -> int:
@@ -1190,15 +1250,27 @@ def compute_checksum(data: bytes) -> int:
 
     Outputs:
         int: The computed checksum.
+
+    Raises:
+        TypeError: If data is not bytes.
     """
     # Input validation
     if not isinstance(data, bytes):
         raise TypeError("data must be bytes")
 
+    # Explicitly annotate digest variables
+    digest: bytes
+
     if has_blake3 and blake3 is not None:
-        # trunk-ignore(pyright/reportPossiblyUnboundVariable)
-        return int.from_bytes(blake3.blake3(data).digest()[:16], "big")
-    return int.from_bytes(hashlib.sha3_256(data).digest()[:16], "big")
+        # Use blake3 if available (faster and more secure)
+        digest = blake3.blake3(data).digest()[:16]
+    else:
+        # Fall back to SHA3-256 if blake3 is not available
+        digest = hashlib.sha3_256(data).digest()[:16]
+    
+    # Convert digest to integer with explicit annotation
+    checksum: int = int.from_bytes(digest, byteorder="big")
+    return checksum
 
 def create_secure_deterministic_rng(seed: bytes) -> Callable[[Union[int, "gmpy2.mpz"]], int]:
     """
@@ -2064,29 +2136,28 @@ class CyclicGroup:
         result: "gmpy2.mpz" = gmpy2.mpz(1)
         remaining: "gmpy2.mpz" = exponent_mpz
 
-        # Process large steps first
-        large_count: int
-        max_step: int
+            # Process large steps first
         while remaining >= large_step:
             # Extract how many large steps to take
-            large_count = remaining // large_step
-            if large_count in large_window:
+            large_count_mpz = remaining // large_step
+            large_count_int = int(large_count_mpz)  # Convert to int for dict key
+            
+            if large_count_int in large_window:
                 # Use precomputed large step
-                result = (result * large_window[large_count]) % self.prime
-                remaining -= large_count * large_step
+                result = gmpy2.mul(result, large_window[large_count_int]) % self.prime
+                remaining = remaining - gmpy2.mul(large_count_mpz, large_step)
             else:
                 # Take the largest available step
-                max_step = max(
-                    (k for k in large_window.keys() if k <= large_count), default=0
+                max_step: int = max(
+                    (k for k in large_window.keys() if k <= large_count_int), default=0
                 )
                 if max_step > 0:
-                    result = (result * large_window[max_step]) % self.prime
-                    remaining -= max_step * large_step
+                    result = gmpy2.mul(result, large_window[max_step]) % self.prime
+                    remaining = remaining - gmpy2.mul(gmpy2.mpz(max_step), large_step)
                 else:
                     # Fall back to small steps
                     break
-
-        # Process remaining small steps
+      # Process remaining small steps
         small_val: int
         while remaining > 0:
             # Extract small window bits
@@ -2131,8 +2202,7 @@ class CyclicGroup:
                 "Multiplication operation would exceed memory limits. "
                 "The operands are too large for available system memory."
             )
-
-        return (a_mpz * b_mpz) % self.prime
+        return gmpy2.mod(a_mpz * b_mpz, self.prime)
 
     def secure_random_element(self) -> "gmpy2.mpz":
         """
@@ -2148,7 +2218,8 @@ class CyclicGroup:
         Outputs:
             int: A random element in the range [1, prime-1].
         """
-        return gmpy2.mpz(secrets.randbelow(int(self.prime - 1)) + 1)
+        random_element: "gmpy2.mpz" = gmpy2.mpz(secrets.randbelow(exclusive_upper_bound=int(self.prime - 1)) + 1)
+        return random_element
 
     def clear_cache(self) -> None:
         """
@@ -2267,12 +2338,12 @@ class CyclicGroup:
         encoded: bytes = b""
 
         # Add protocol version identifier
-        encoded += VSS_VERSION.encode("utf-8")
+        encoded += VSS_VERSION.encode(encoding="utf-8")
 
         # Add context string with type tag and length prefixing for domain separation
-        context_bytes: bytes = context.encode("utf-8")
+        context_bytes: bytes = context.encode(encoding="utf-8")
         encoded += b"\x01"  # Type tag for context string
-        encoded += len(context_bytes).to_bytes(4, "big")
+        encoded += len(context_bytes).to_bytes(length=4, byteorder="big")
         encoded += context_bytes
 
         # Calculate byte length for integer serialization once
@@ -2289,16 +2360,16 @@ class CyclicGroup:
                 arg_bytes = arg
             elif isinstance(arg, str):
                 encoded += b"\x01"  # Tag for string
-                arg_bytes = arg.encode("utf-8")
+                arg_bytes = arg.encode(encoding="utf-8")
             elif isinstance(arg, int) or isinstance(arg, gmpy2.mpz):
                 encoded += b"\x02"  # Tag for int/mpz
                 arg_bytes = int(arg).to_bytes(byte_length, "big")
             else:
                 encoded += b"\x03"  # Tag for other types
-                arg_bytes = str(arg).encode("utf-8")
+                arg_bytes = str(arg).encode(encoding="utf-8")
 
             # Add 4-byte length followed by the data itself
-            encoded += len(arg_bytes).to_bytes(4, "big")
+            encoded += len(arg_bytes).to_bytes(4, byteorder="big")
             encoded += arg_bytes
 
         return encoded
@@ -2370,7 +2441,7 @@ class CyclicGroup:
                 j: int
                 for j in range(n):
                     if (i >> j) & 1:
-                        product = (product * bases_mpz[j]) % prime
+                        product = gmpy2.mod(product * bases_mpz[j], prime)
                 precomp[i] = product
         else:
             # For larger n, use selective precomputation
@@ -2676,7 +2747,7 @@ class FeldmanVSS:
             if isinstance(extra_entropy, bytes):
                 elements.append(extra_entropy)
             else:
-                elements.append(str(extra_entropy).encode("utf-8"))
+                elements.append(str(extra_entropy).encode(encoding="utf-8"))
 
         # Use the consistent encoding method from the group class
         encoded: bytes = self.group._enhanced_encode_for_hash(*elements)
