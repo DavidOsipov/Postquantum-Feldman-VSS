@@ -1746,7 +1746,7 @@ class CyclicGroup:
         a: int
         x: "gmpy2.mpz"
         for _ in range(k):
-            a = secrets.randbelow(n - 3) + 2
+            a = secrets.randbelow(exclusive_upper_bound=int(n - 3)) + 2
             x = gmpy2.powmod(a, d, n)
             if x == 1 or x == n - 1:
                 continue
@@ -2192,14 +2192,14 @@ class CyclicGroup:
                         + block_counter.to_bytes(8, "big")
                     )
 
-                    if has_blake3:
+                    if has_blake3 and blake3 is not None:
                         h = blake3.blake3(block_data).digest(
-                            min(32, total_bytes - len(hash_blocks))
+                            length=min(32, total_bytes - len(hash_blocks))
                         )
                     else:
                         h = hashlib.sha3_256(block_data).digest()
-                    hash_blocks.extend(h)
-                    block_counter += 1
+                hash_blocks.extend(h)
+                block_counter += 1
 
                 # Convert to integer, using only the necessary bytes
                 value: int = int.from_bytes(hash_blocks[:required_bytes], "big")
