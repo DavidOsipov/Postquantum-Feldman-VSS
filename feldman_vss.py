@@ -209,7 +209,7 @@ __version__ = "0.8.1b0"
 
 # The above code is defining the `__all__` list in a Python module. This list specifies the names of
 # the symbols that should be exported when using the `from module import *` syntax.
-__all__ = [
+__all__: List[str] = [
     "FeldmanVSS",
     "VSSConfig",
     "get_feldman_vss",
@@ -406,9 +406,6 @@ ProofDict = TypedDict('ProofDict', {
 VerificationResult = tuple[bool, dict[int, bool]]
 RefreshingResult = tuple[ShareDict, CommitmentList, dict[str, Any]]
 
-HashCommitment = tuple[FieldElement, Randomizer, Optional[bytes]]  # (hash, randomizer, entropy)
-CommitmentList = list[HashCommitment]  # List of commitments
-
 ProofDict = TypedDict('ProofDict', {
     'blinding_commitments': list[tuple[FieldElement, FieldElement]],
     'challenge': FieldElement,
@@ -417,13 +414,6 @@ ProofDict = TypedDict('ProofDict', {
     'blinding_randomizers': list[FieldElement],
     'timestamp': int
 })
-
-VerificationResult = tuple[bool, dict[int, bool]]
-RefreshingResult = tuple[ShareDict, CommitmentList, dict[str, Any]]
-
-# Type Aliases for Complex Types
-HashFunc = Callable[[bytes], Any]
-RedundantExecutorFunc = Callable[..., Any]
 
 # Custom warning for security issues
 class SecurityWarning(Warning):
