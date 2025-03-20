@@ -4443,7 +4443,7 @@ class FeldmanVSS:
                 
         # For small numbers, use a smaller batch size
         if (num_participants < 10):
-            base_batch_size = min(8, num_participants)
+            base_batch_size: int = min(8, num_participants)
             # Even with small participants, adjust for highly uneven share distribution
             if num_shares is not None and num_shares > num_participants * 10:
                 return max(2, int(base_batch_size / 2))  # More conservative reduction for small systems
@@ -4454,7 +4454,7 @@ class FeldmanVSS:
         if security_level is not None:
             # Convert security level (0-10) to a reduction factor (1.0 to 0.4)
             # Higher security = smaller batches for more granular verification
-            adjustment_factor = max(0.4, 1.0 - (security_level / 15))
+            adjustment_factor: float = max(0.4, 1.0 - (security_level / 15))
         
         # For larger systems, use a batch size that balances efficiency
         # with the ability to quickly identify problematic shares
@@ -4466,18 +4466,21 @@ class FeldmanVSS:
             
             # Hybrid approach: Consider both logarithmic scaling and CPU count
             # Ensure minimum reasonable batch size with the max(4, ...) operation
-            log_factor: int = max(4, int(math.log2(max(2, num_participants)) * 4 * adjustment_factor))
-cpu_factor = max(8, int(num_participants // cpu_count * adjustment_factor))
+            num_participants_int: int = num_participants  # Type hint for clarity
+            adjustment_factor_float: float = adjustment_factor  # Type hint for clarity
+            cpu_count_int: int = cpu_count  # Type hint for clarity
+            log_factor: int = max(4, int(math.log2(max(2, num_participants_int)) * 4 * adjustment_factor_float))
+            cpu_factor: int = max(8, int(num_participants_int // cpu_count_int * adjustment_factor_float))
             
             # Use the smaller of the two factors to keep batches manageable
-            batch_size = min(32, min(log_factor, cpu_factor))
+            batch_size: int = min(32, min(log_factor, cpu_factor))
             
             # If num_shares is provided, adjust for highly skewed distributions
             if num_shares is not None and num_shares > num_participants:
-                shares_per_participant = num_shares / max(1, num_participants)
+                shares_per_participant: float = num_shares / max(1, num_participants)
                 if shares_per_participant > 10:  # Only adjust for highly uneven distributions
                     # Use logarithmic scaling to avoid extreme reductions
-                    reduction_factor = min(3, math.log2(shares_per_participant) / 4)  # Cap the reduction
+                    reduction_factor: float = min(3, math.log2(shares_per_participant) / 4)  # Cap the reduction
                     batch_size = max(4, int(batch_size / reduction_factor))
                     
             return batch_size
@@ -5185,7 +5188,7 @@ cpu_factor = max(8, int(num_participants // cpu_count * adjustment_factor))
                     extra_entropy = commitments[0][2]  # Get extra_entropy from first coefficient
 
                 actual_commitment: FieldElement = self._compute_hash_commitment(
-                    y, r_combined, int(x), "verify", extra_entropy
+                    y, r_combined, x, "verify", extra_entropy
                 )
 
                 evidence["inconsistent_shares"][recipient_id] = {
