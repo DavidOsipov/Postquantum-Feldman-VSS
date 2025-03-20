@@ -1737,7 +1737,7 @@ class CyclicGroup:
         # Write n as 2^r * d + 1
         r: int
         d: Union[int, "gmpy2.mpz"]
-        r, d = 0, n - 1
+        r, d = 0, gmpy2.mpz(n - 1)  # Explicitly convert to mpz
         while d % 2 == 0:
             r += 1
             d //= 2
@@ -1746,7 +1746,27 @@ class CyclicGroup:
         a: int
         x: "gmpy2.mpz"
         for _ in range(k):
-            a = secrets.randbelow(exclusive_upper_bound=int(n - 3)) + 2
+            # More secure way to generate witnesses using secrets module
+            # Generate random bits and apply modular reduction
+            # Ensuring the witness is in the range [2, n-2]
+            n_minus_3 = int(n - 3)
+            if n_minus_3 <= 0:
+                # Defensive check for small values of n
+                return True
+                
+            # Generate random bits with sufficient entropy
+            num_bits = n_minus_3.bit_length()
+            while True:
+                # Use secrets.token_bytes for high entropy source
+                random_bytes = secrets.token_bytes((num_bits + 7) // 8)
+                # Convert to integer
+                rand_val = int.from_bytes(random_bytes, byteorder='big')
+                # Ensure proper range through modular reduction
+                a = (rand_val % n_minus_3) + 2
+                # Verify a is in valid range [2, n-2]
+                if 2 <= a < n - 1:
+                    break
+                    
             x = gmpy2.powmod(a, d, n)
             if x == 1 or x == n - 1:
                 continue
@@ -1773,7 +1793,17 @@ class CyclicGroup:
         Outputs:
             bool: True if p is a safe prime, False otherwise.
         """
-        return CyclicGroup._is_probable_prime((p - 1) // 2)
+        # Convert p to mpz to ensure correct handling of types
+        p_mpz = gmpy2.mpz(p)
+        
+        # For efficiency, first check if p itself is prime
+        if not CyclicGroup._is_probable_prime(p_mpz):
+            return False
+            
+        # Now check if (p-1)/2 is also prime
+        # Explicitly convert the divisor to mpz for type checking
+        q: "gmpy2.mpz" = gmpy2.mpz(p_mpz - 1) >> 1
+        return CyclicGroup._is_probable_prime(q)
 
     def _generate_prime(self, bits: int) -> "gmpy2.mpz":
         """
@@ -1817,7 +1847,7 @@ class CyclicGroup:
             # Generate candidate q
             q = self._generate_prime(bits - 1)
             # Compute p = 2q + 1
-            p = 2 * q + 1
+            p = gmpy2.mpz(2 * q + 1)
             if self._is_probable_prime(p):
                 return gmpy2.mpz(p)
 
@@ -1978,8 +2008,8 @@ class CyclicGroup:
         # Normalize inputs
         base_mpz: "gmpy2.mpz" = gmpy2.mpz(base % self.prime)
         
-        # Optimization: For safe primes p=2q+1, reduce modulo q instead of p-1
-        q: "gmpy2.mpz" = (self.prime - 1) // 2
+            # Optimization: For safe primes p=2q+1, reduce modulo q instead of p-1
+        q: "gmpy2.mpz" = (self.prime - 1) // 2  # Using integer division
         exponent_mpz: "gmpy2.mpz" = gmpy2.mpz(exponent % q)  # More efficient than % (self.prime - 1)
 
         # Check memory safety before proceeding

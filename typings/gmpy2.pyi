@@ -1,6 +1,6 @@
 """
 Type stubs for gmpy2 - GNU Multiple Precision Arithmetic Library interface
-This file provides type hints for the gmpy2 library functions used in Feldman VSS.
+This file provides type hints for the gmpy2 library functions used in Post-Quantim Feldman's VSS.
 """
 
 from typing import Any, Callable, Optional, Tuple, TypeVar, Union
