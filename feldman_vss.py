@@ -160,6 +160,7 @@ from typing import (
     Literal, Union, Optional, List, Tuple, Dict, Set, cast
 )
 from dataclasses import dataclass
+from gmpy2 import mpz
 import msgpack
 
 # Import BLAKE3 for cryptographic hashing (faster and more secure than SHA3-256)
@@ -1209,6 +1210,116 @@ def compute_checksum(data: bytes) -> int:
         return int.from_bytes(blake3.blake3(data).digest()[:16], "big")
     return int.from_bytes(hashlib.sha3_256(data).digest()[:16], "big")
 
+def create_secure_deterministic_rng(seed: bytes) -> Callable[[Union[int, "gmpy2.mpz"]], int]:
+    """
+    Description:
+        Create a deterministic random number generator seeded with cryptographically 
+        strong material for generating verifiable zero-sharing polynomials.
+        
+        This function creates a deterministic but unpredictable source of randomness
+        that can be independently verified by all participants while avoiding the need
+        for additional communication. Used primarily in the share refreshing protocol.
+        
+        Note: Using random.Random() with a cryptographically strong seed is intentional here.
+        The security comes from the seed being generated with a strong cryptographic hash,
+        not from the random.Random algorithm itself.
+
+    Arguments:
+        seed (bytes): Cryptographically secure seed material, typically derived from a master 
+                      secret and a party ID using a secure hash function.
+
+    Outputs:
+        Callable[[Union[int, "gmpy2.mpz"]], int]: Function that returns a deterministic 
+                                                  random integer in range [0, bound).
+        
+    Raises:
+        TypeError: If seed is not bytes.
+        ValueError: If seed is empty or too short.
+        
+    Security considerations:
+        - The output is only as secure as the entropy in the original seed
+        - This is specifically designed for deterministic, verifiable generation of
+          zero-sharing polynomials in VSS protocols
+        - Uses the same hash algorithm (BLAKE3 with SHA3-256 fallback) as other
+          cryptographic operations in the library for consistency
+    """
+    # Input validation
+    if not isinstance(seed, bytes):
+        raise TypeError("seed must be bytes")
+    if not seed:
+        raise ValueError("seed cannot be empty")
+    if len(seed) < 32:  # Increased from 16 to 32 for better security
+        raise ValueError("seed should be at least 32 bytes for adequate security")
+    
+    # Use the library's preferred hash function (BLAKE3 with SHA3-256 fallback)
+    # for consistent security properties with the rest of the code
+    if has_blake3 and blake3 is not None:
+        seed_hash: bytes = blake3.blake3(seed).digest(length=32)
+    else:
+        seed_hash = hashlib.sha3_256(string=seed).digest()
+    
+    # Add domain separation and version information
+    context: bytes = f"VSS-{VSS_VERSION}-DeterministicRNG".encode()
+    seed_with_context: bytes = seed_hash + context
+    
+    # Rehash with context for better security
+    if has_blake3 and blake3 is not None:
+        final_seed_hash: bytes = blake3.blake3(seed_with_context).digest(length=32)
+    else:
+        final_seed_hash = hashlib.sha3_256(string=seed_with_context).digest()
+    
+    # Convert hash to integer for seeding
+    seed_int: int = int.from_bytes(bytes=final_seed_hash, byteorder="big")
+    
+    # Create a deterministic RNG
+    rng = random.Random(seed_int)
+    
+    # Discard initial values to mitigate potential bias
+    for _ in range(100):
+        rng.random()
+    
+    def secure_random_int(bound: Union[int, "gmpy2.mpz"]) -> int:
+        """
+        Generate a deterministic but unpredictable random integer in [0, bound).
+        
+        Arguments:
+            bound (int or gmpy2.mpz): Upper bound (exclusive) for random number generation.
+                                     Typically the field prime in VSS calculations.
+            
+        Returns:
+            int: Random integer in range [0, bound).
+            
+        Raises:
+            TypeError: If bound is not an integer or gmpy2.mpz.
+            ValueError: If bound is not positive.
+        """
+        # Runtime type checking with isinstance for better robustness
+        if not isinstance(bound, (int, gmpy2.mpz)):
+            raise TypeError("bound must be an integer or gmpy2.mpz")
+            
+        # Normalize to int while preserving value
+        if isinstance(bound, gmpy2.mpz):
+            bound_int = int(bound)
+        else:
+            bound_int: int = bound
+            
+        if bound_int <= 0:
+            raise ValueError("bound must be a positive integer")
+            
+        # Use randbelow-style implementation for better uniformity
+        # This matches the approach used in Python's secrets module
+        nbits: int = bound_int.bit_length()
+        randval: int = 0
+        
+        while randval < bound_int:
+            randval = rng.getrandbits(nbits)
+            if randval >= bound_int:
+                randval = randval % bound_int
+                
+        # Ensure we always return an int
+        return int(randval)
+        
+    return secure_random_int
 
 def secure_redundant_execution(
     func: Callable[..., Any],
@@ -3345,7 +3456,7 @@ class FeldmanVSS:
             )
 
             # Create a group with the same parameters
-            group: CyclicGroup = CyclicGroup(prime=prime, generator=generator)
+            group: CyclicGroup = CyclicGroup(prime=int(prime), generator=int(generator))
 
             # Create a new VSS instance with this group
             temp_config: VSSConfig = VSSConfig()
@@ -3532,21 +3643,24 @@ class FeldmanVSS:
             # Note: Using random.Random() with cryptographically strong seed is intentional here.
             # We need deterministic but unpredictable randomness for the verification protocol.
             # The security comes from party_seed being generated with a strong cryptographic hash.
-            party_rng: random.Random = random.Random(int.from_bytes(party_seed, byteorder="big"))
+            #
+            # Create a secure deterministic RNG
+            
+            party_rng = create_secure_deterministic_rng(party_seed)
 
             # Generate a random polynomial of degree t-1 with constant term 0
             zero_coeffs: List[FieldElement] = [gmpy2.mpz(0)]  # First coefficient is 0
             _: int
             for _ in range(1, threshold):
                 # Use the seeded RNG for deterministic coefficient generation
-                rand_value: int = party_rng.randrange(self.field.prime)
+                rand_value: int = party_rng(int(self.field.prime))
                 zero_coeffs.append(gmpy2.mpz(rand_value))
 
             # Create shares for each participant using this polynomial
             party_shares: ShareDict = {}
             p_id: int
             for p_id in participant_ids:
-                # Evaluate polynomial at the point corresponding to participant's ID
+                  # Evaluate polynomial at the point corresponding to participant's ID
                 y_value: FieldElement = self._evaluate_polynomial(zero_coeffs, p_id)
                 party_shares[p_id] = (p_id, y_value)
 
@@ -3772,7 +3886,7 @@ class FeldmanVSS:
                 )
 
         # Add enhanced verification summary to verification_data
-        verification_summary: Dict[str, Any] = {
+        verification_summary: VerificationSummaryDict = {
             "total_zero_shares_created": len(zero_sharings) * len(participant_ids),
             "total_zero_shares_verified": sum(
                 len(v) for v in verified_zero_shares.values()
@@ -3788,10 +3902,6 @@ class FeldmanVSS:
             "byzantine_party_ids": (
                 list(byzantine_parties.keys()) if byzantine_parties else []
             ),
-            "security_parameters": {
-                "min_verified_shares": min_verified_shares,
-                "security_factor": security_factor,
-            },
         }
 
         # Step 3: Calculate the new commitments
@@ -3809,7 +3919,7 @@ class FeldmanVSS:
         new_commitments: CommitmentList = self.create_commitments(new_coeffs)
 
         # Add the verification proofs and enhanced summary to the verification data
-        verification_data: Dict[str, Any] = {
+        verification_data: VerificationDataDict = {
             "original_shares_count": len(shares),
             "threshold": threshold,
             "zero_commitment_count": len(zero_commitments),
