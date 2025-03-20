@@ -72,10 +72,10 @@ packages = [
 ]
 
 [tool.pyright]
-pythonVersion = "3.10"
+pythonVersion = "3.13"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 gmpy2 = "==2.2.1"
 msgpack = "==1.1.0"
 blake3 = "==1.0.4"
