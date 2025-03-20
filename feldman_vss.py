@@ -4261,6 +4261,8 @@ class FeldmanVSS:
 
         Outputs:
             dict: Dictionary mapping (party_id, participant_id) to consistency result.
+                True means the party sent consistent values to all participants,
+                False means inconsistent values were detected.
             
         Side Effects:
             Stores Byzantine evidence in self._byzantine_evidence for later access by _detect_byzantine_behavior.
@@ -4314,93 +4316,118 @@ class FeldmanVSS:
 
         # Create cryptographically secure fingerprints of each sharing
         share_fingerprints: Dict[int, Dict[int, bytes]] = {}
-
         
-        party_id: int
+        sending_party_id: int
         party_shares: ShareDict
-        for party_id, party_shares in zero_sharings.items():
-            share_fingerprints[party_id] = {}
+        for sending_party_id, party_shares in zero_sharings.items():
+            share_fingerprints[sending_party_id] = {}
             
-            p_id: int
+            recipient_id: int
             x: FieldElement
             y: FieldElement
-            for p_id, (x, y) in party_shares.items():
-                if p_id in participant_ids:
+            for recipient_id, (x, y) in party_shares.items():
+                if recipient_id in participant_ids:
                     # Create a secure fingerprint using proper domain separation
                     message: bytes = self.group._enhanced_encode_for_hash(
-                        party_id, p_id, x, y, "echo-consistency-check"
+                        sending_party_id, recipient_id, x, y, "echo-consistency-check"
                     )
                     fingerprint: bytes = self.hash_algorithm(message).digest()
-                    share_fingerprints[party_id][p_id] = fingerprint
+                    share_fingerprints[sending_party_id][recipient_id] = fingerprint
 
         # Echo broadcast phase: participants share what they received
         echo_broadcasts: Dict[int, Dict[int, Tuple[SharePoint, bytes]]] = {}
-        p_id: int
-        for p_id in participant_ids:
-            echo_broadcasts[p_id] = {}
+        recipient_id: int
+        for recipient_id in participant_ids:
+            echo_broadcasts[recipient_id] = {}
             # Collect all shares this participant received
             
-            party_id: int
-            for party_id in zero_sharings:
-                if p_id in zero_sharings[party_id]:
-                    share: SharePoint = zero_sharings[party_id][p_id]
-                    fingerprint: Optional[bytes] = share_fingerprints[party_id].get(p_id)
-                    if fingerprint:
-                        echo_broadcasts[p_id][party_id] = (share, fingerprint)
+            sending_party_id: int
+            for sending_party_id in zero_sharings:
+                if recipient_id in zero_sharings[sending_party_id]:
+                    share: SharePoint = zero_sharings[sending_party_id][recipient_id]
+                    fingerprint: Optional[bytes] = share_fingerprints.get(sending_party_id, {}).get(recipient_id)
+                    if fingerprint is not None:
+                        echo_broadcasts[recipient_id][sending_party_id] = (share, fingerprint)
 
         # Consistency check phase: compare what different participants received
         byzantine_evidence: Dict[int, Dict[str, Any]] = {}
         
         p1_id: int
         for p1_id in participant_ids:
-            
             p2_id: int
             for p2_id in participant_ids:
                 if p1_id >= p2_id:  # Only check each pair once
                     continue
 
                 # Compare what p1 and p2 received from each party
-                
-                party_id: int
-                for party_id in zero_sharings:
-                    if (
-                        party_id in echo_broadcasts[p1_id]
-                        and party_id in echo_broadcasts[p2_id]
-                    ):
+                sending_party_id: int
+                for sending_party_id in zero_sharings:
+                    p1_has_data = sending_party_id in echo_broadcasts.get(p1_id, {})
+                    p2_has_data = sending_party_id in echo_broadcasts.get(p2_id, {})
+                    
+                    if p1_has_data and p2_has_data:
+                        # Extract shares and fingerprints safely
+                        try:
+                            p1_share: SharePoint
+                            p1_fingerprint: bytes
+                            p2_share: SharePoint
+                            p2_fingerprint: bytes
+                            
+                            p1_data = echo_broadcasts[p1_id][sending_party_id]
+                            p2_data = echo_broadcasts[p2_id][sending_party_id]
+                            
+                            if not isinstance(p1_data, tuple) or len(p1_data) != 2:
+                                # Sanitize message but still log it
+                                detailed_msg = f"Invalid data format from party {sending_party_id} to participant {p1_id}"
+                                sanitized_msg = self._sanitize_error("Invalid data format", detailed_msg)
+                                logger.warning(sanitized_msg, exc_info=True)
+                                continue
+                                
+                            if not isinstance(p2_data, tuple) or len(p2_data) != 2:
+                                detailed_msg = f"Invalid data format from party {sending_party_id} to participant {p2_id}"
+                                sanitized_msg = self._sanitize_error("Invalid data format", detailed_msg)
+                                logger.warning(sanitized_msg, exc_info=True)
+                                continue
+                                
+                            p1_share, p1_fingerprint = p1_data
+                            p2_share, p2_fingerprint = p2_data
 
-                        # Extract shares and fingerprints
-                        p1_share: SharePoint
-                        p1_fingerprint: bytes
-                        p2_share: SharePoint
-                        p2_fingerprint: bytes
-                        (p1_share, p1_fingerprint) = echo_broadcasts[p1_id][party_id]
-                        (p2_share, p2_fingerprint) = echo_broadcasts[p2_id][party_id]
+                            # Use constant-time comparison for security (prevent timing attacks)
+                            is_consistent: bool = constant_time_compare(p1_fingerprint, p2_fingerprint)
 
-                        # Check if party sent consistent values to both participants
-                        is_consistent: bool = p1_fingerprint == p2_fingerprint
+                            # Record consistency results for both participants
+                            consistency_results[(sending_party_id, p1_id)] = is_consistent
+                            consistency_results[(sending_party_id, p2_id)] = is_consistent
 
-                        # Record consistency results for both participants
-                        consistency_results[(party_id, p1_id)] = is_consistent
-                        consistency_results[(party_id, p2_id)] = is_consistent
+                            # If inconsistent, collect evidence of Byzantine behavior
+                            if not is_consistent:
+                                if sending_party_id not in byzantine_evidence:
+                                    byzantine_evidence[sending_party_id] = {
+                                        "type": "equivocation",
+                                        "evidence": [],
+                                    }
 
-                        # If inconsistent, collect evidence of Byzantine behavior
-                        if not is_consistent:
-                            if party_id not in byzantine_evidence:
-                                byzantine_evidence[party_id] = {
-                                    "type": "equivocation",
-                                    "evidence": [],
-                                }
-
-                            byzantine_evidence[party_id]["evidence"].append(
-                                {
-                                    "participant1": p1_id,
-                                    "share1": p1_share,
-                                    "participant2": p2_id,
-                                    "share2": p2_share,
-                                    "fingerprint1": p1_fingerprint.hex(),
-                                    "fingerprint2": p2_fingerprint.hex(),
-                                }
-                            )
+                                # Store share values directly rather than references for better security
+                                # and to prevent possible modifications
+                                byzantine_evidence[sending_party_id]["evidence"].append(
+                                    {
+                                        "participant1": p1_id,
+                                        "share1": (int(p1_share[0]), int(p1_share[1])),
+                                        "participant2": p2_id,
+                                        "share2": (int(p2_share[0]), int(p2_share[1])),
+                                        "fingerprint1": p1_fingerprint.hex(),
+                                        "fingerprint2": p2_fingerprint.hex(),
+                                        "timestamp": int(time.time()),  # Add timestamp for forensics
+                                    }
+                                )
+                        except (KeyError, ValueError, TypeError) as e:
+                            # Safely handle unexpected errors with sanitized messages
+                            detailed_msg = f"Error comparing shares: {e}"
+                            sanitized_msg = self._sanitize_error("Share comparison error", detailed_msg)
+                            logger.error(sanitized_msg, exc_info=True)
+                            # Default to inconsistent if we can't verify properly
+                            consistency_results[(sending_party_id, p1_id)] = False
+                            consistency_results[(sending_party_id, p2_id)] = False
 
         # Store Byzantine evidence in a separate field rather than modifying the
         # return structure to maintain compatibility with existing code
@@ -4416,8 +4443,8 @@ class FeldmanVSS:
         Arguments:
             num_participants (int): Number of participants.
             security_level (int, optional): Security intensity level (0-10). Higher values result
-                                           in smaller batches for more granular verification.
-                                           Default is None (use standard calculation).
+                in smaller batches for more granular verification.
+                Default is None (use standard calculation).
             num_shares (int, optional): Total number of shares in the system, allowing for
                                         more nuanced batch sizing when share distribution is uneven.
 
