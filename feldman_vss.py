@@ -289,20 +289,20 @@ SAFE_PRIMES = {
 EvidenceEntryDict = TypedDict('EvidenceEntryDict', {
     'party_id': int,
     'action': str,
-    'data': Dict[str, Union[int, str, bool]],
+    'data': dict[str, Union[int, str, bool]],
     'timestamp': int
 })
 
 ByzantineEvidenceDict = TypedDict('ByzantineEvidenceDict', {
     'type': str,
-    'evidence': List[EvidenceEntryDict],
+    'evidence': list[EvidenceEntryDict],
     'timestamp': int,
     'signature': str
 })
 
 FieldElement = Union[int, "gmpy2.mpz"]  # Integer field elements
-SharePoint = Tuple[FieldElement, FieldElement]  # (x, y) coordinate
-ShareDict = Dict[int, SharePoint]  # Maps participant ID to share
+SharePoint = tuple[FieldElement, FieldElement]  # (x, y) coordinate
+ShareDict = dict[int, SharePoint]  # Maps participant ID to share
 Randomizer = FieldElement  # Randomizer values for commitments
 
 InvalidityProofDict = TypedDict('InvalidityProofDict', {
@@ -320,11 +320,11 @@ InvalidityProofDict = TypedDict('InvalidityProofDict', {
 VerificationSummaryDict = TypedDict('VerificationSummaryDict', {
     'total_zero_shares_created': int,
     'total_zero_shares_verified': int,
-    'invalid_shares_detected': Dict[int, List[int]],
+    'invalid_shares_detected': dict[int, list[int]],
     'participants_with_full_verification': int,
     'potential_collusion_detected': bool,
     'byzantine_parties_excluded': int,
-    'byzantine_party_ids': List[int]
+    'byzantine_party_ids': list[int]
 })
 
 VerificationDataDict = TypedDict('VerificationDataDict', {
@@ -337,7 +337,7 @@ VerificationDataDict = TypedDict('VerificationDataDict', {
     'hash_based': bool,
     'verification_summary': VerificationSummaryDict,
     'seed_fingerprint': str,
-    'verification_proofs': Dict[int, Dict[int, Any]]
+    'verification_proofs': dict[int, dict[int, Any]]
 })
 
 # New TypedDict definitions for more complex return types
@@ -357,8 +357,8 @@ ForensicDataDict = TypedDict('ForensicDataDict', {
     'timestamp': int,
     'error_type': str,
     'detailed_info': Optional[str],
-    'share_info': Optional[Dict[str, Any]],
-    'commitment_info': Optional[Dict[str, Any]]
+    'share_info': Optional[dict[str, Any]],
+    'commitment_info': Optional[dict[str, Any]]
 })
 
 ByzantineDetectionResultDict = TypedDict('ByzantineDetectionResultDict', {
@@ -366,17 +366,17 @@ ByzantineDetectionResultDict = TypedDict('ByzantineDetectionResultDict', {
     'failure_count': int,
     'total_shares': int,
     'failure_rate': float,
-    'evidence': List[Dict[str, Any]],
-    'affected_participants': List[int],
+    'evidence': list[dict[str, Any]],
+    'affected_participants': list[int],
     'timestamp': int
 })
 
 DualCommitmentProofDict = TypedDict('DualCommitmentProofDict', {
-    'feldman_blinding_commitments': List[Union[Tuple[FieldElement, FieldElement], FieldElement]],
-    'pedersen_blinding_commitments': List[FieldElement],
+    'feldman_blinding_commitments': list[Union[tuple[FieldElement, FieldElement], FieldElement]],
+    'pedersen_blinding_commitments': list[FieldElement],
     'challenge': int,
-    'responses': List[int],
-    'response_randomizers': Optional[List[int]]
+    'responses': list[int],
+    'response_randomizers': Optional[list[int]]
 })
 
 IntegrationResultDict = TypedDict('IntegrationResultDict', {
@@ -390,35 +390,35 @@ IntegrationResultDict = TypedDict('IntegrationResultDict', {
 HashFunc = Callable[[bytes], Any]
 RedundantExecutorFunc = Callable[..., Any]
 
-HashCommitment = Tuple[FieldElement, Randomizer, Optional[bytes]]  # (hash, randomizer, entropy)
-CommitmentList = List[HashCommitment]  # List of commitments
+HashCommitment = tuple[FieldElement, Randomizer, Optional[bytes]]  # (hash, randomizer, entropy)
+CommitmentList = list[HashCommitment]  # List of commitments
 
 ProofDict = TypedDict('ProofDict', {
-    'blinding_commitments': List[Tuple[FieldElement, FieldElement]],
+    'blinding_commitments': list[tuple[FieldElement, FieldElement]],
     'challenge': FieldElement,
-    'responses': List[FieldElement],
-    'commitment_randomizers': List[FieldElement],
-    'blinding_randomizers': List[FieldElement],
+    'responses': list[FieldElement],
+    'commitment_randomizers': list[FieldElement],
+    'blinding_randomizers': list[FieldElement],
     'timestamp': int
 })
 
-VerificationResult = Tuple[bool, Dict[int, bool]]
-RefreshingResult = Tuple[ShareDict, CommitmentList, Dict[str, Any]]
+VerificationResult = tuple[bool, dict[int, bool]]
+RefreshingResult = tuple[ShareDict, CommitmentList, dict[str, Any]]
 
-HashCommitment = Tuple[FieldElement, Randomizer, Optional[bytes]]  # (hash, randomizer, entropy)
-CommitmentList = List[HashCommitment]  # List of commitments
+HashCommitment = tuple[FieldElement, Randomizer, Optional[bytes]]  # (hash, randomizer, entropy)
+CommitmentList = list[HashCommitment]  # List of commitments
 
 ProofDict = TypedDict('ProofDict', {
-    'blinding_commitments': List[Tuple[FieldElement, FieldElement]],
+    'blinding_commitments': list[tuple[FieldElement, FieldElement]],
     'challenge': FieldElement,
-    'responses': List[FieldElement],
-    'commitment_randomizers': List[FieldElement],
-    'blinding_randomizers': List[FieldElement],
+    'responses': list[FieldElement],
+    'commitment_randomizers': list[FieldElement],
+    'blinding_randomizers': list[FieldElement],
     'timestamp': int
 })
 
-VerificationResult = Tuple[bool, Dict[int, bool]]
-RefreshingResult = Tuple[ShareDict, CommitmentList, Dict[str, Any]]
+VerificationResult = tuple[bool, dict[int, bool]]
+RefreshingResult = tuple[ShareDict, CommitmentList, dict[str, Any]]
 
 # Type Aliases for Complex Types
 HashFunc = Callable[[bytes], Any]
@@ -455,7 +455,7 @@ class SerializationError(Exception):
     """
     def __init__(self, message: str, detailed_info: Optional[str] = None, 
                  severity: str = "critical", timestamp: Optional[int] = None,
-                 data_format: Optional[str] = None, checksum_info: Optional[Dict[str, Any]] = None):
+                 data_format: Optional[str] = None, checksum_info: Optional[dict[str, Any]] = None):
         self.message = message
         self.detailed_info = detailed_info
         self.severity = severity
@@ -467,7 +467,7 @@ class SerializationError(Exception):
         self.checksum_info = checksum_info  # Stores checksum validation details if applicable
         super().__init__(message)
         
-    def get_forensic_data(self, detail_level: Literal['low', 'medium', 'high'] = 'medium') -> Dict[str, Any]:
+    def get_forensic_data(self, detail_level: Literal['low', 'medium', 'high'] = 'medium') -> dict[str, Any]:
         """
         Return all forensic information as a dictionary for logging or analysis
         
