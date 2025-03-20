@@ -2017,7 +2017,7 @@ class CyclicGroup:
         Outputs:
             int: A random element in the range [1, prime-1].
         """
-        return gmpy2.mpz(secrets.randbelow(self.prime - 1) + 1)
+        return gmpy2.mpz(secrets.randbelow(int(self.prime - 1)) + 1)
 
     def clear_cache(self) -> None:
         """
@@ -2691,7 +2691,7 @@ class FeldmanVSS:
         # Compute the hash commitment
         try:
             computed_commitment: Union[int, "gmpy2.mpz"] = self._compute_hash_commitment(
-                value, combined_randomizer, x, context, extra_entropy
+                value, combined_randomizer, int(x), context, extra_entropy
             )
 
             # Compare with expected commitment using constant-time comparison
@@ -2721,7 +2721,7 @@ class FeldmanVSS:
             ValueError: If coefficients list is empty.
         """
         # Input validation
-        if not isinstance(coefficients, list):
+        if not isinstance(coefficients, list): 
             raise TypeError("coefficients must be a list")
             
         if not coefficients:
