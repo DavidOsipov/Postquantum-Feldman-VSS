@@ -4466,8 +4466,8 @@ class FeldmanVSS:
             
             # Hybrid approach: Consider both logarithmic scaling and CPU count
             # Ensure minimum reasonable batch size with the max(4, ...) operation
-            log_factor = max(4, int(math.log2(max(2, num_participants)) * 4 * adjustment_factor))
-            cpu_factor = max(8, int(num_participants // cpu_count * adjustment_factor))
+            log_factor: int = max(4, int(math.log2(max(2, num_participants)) * 4 * adjustment_factor))
+cpu_factor = max(8, int(num_participants // cpu_count * adjustment_factor))
             
             # Use the smaller of the two factors to keep batches manageable
             batch_size = min(32, min(log_factor, cpu_factor))
@@ -5185,7 +5185,7 @@ class FeldmanVSS:
                     extra_entropy = commitments[0][2]  # Get extra_entropy from first coefficient
 
                 actual_commitment: FieldElement = self._compute_hash_commitment(
-                    y, r_combined, x, "verify", extra_entropy
+                    y, r_combined, int(x), "verify", extra_entropy
                 )
 
                 evidence["inconsistent_shares"][recipient_id] = {
