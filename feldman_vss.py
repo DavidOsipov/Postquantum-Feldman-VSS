@@ -139,10 +139,6 @@ Developer: David Osipov
 # ]
 # ///
 
-# mypy: disallow-untyped-defs=False
-# mypy: disallow-incomplete-defs=False
-# pyright: reportOptionalMemberAccess=false
-
 import hashlib
 import logging
 import random
