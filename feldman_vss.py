@@ -348,6 +348,16 @@ MemoryUsageStatsDict = TypedDict('MemoryUsageStatsDict', {
     'peak_percent': float
 })
 
+MemoryUsageStatsDict = TypedDict('MemoryUsageStatsDict', {
+    'current_bytes': int,
+    'current_mb': float,
+    'peak_bytes': int,
+    'peak_mb': float,
+    'max_mb': int,
+    'usage_percent': float,
+    'peak_percent': float
+})
+
 ForensicDataDict = TypedDict('ForensicDataDict', {
     'message': str,
     'severity': str,
@@ -487,7 +497,7 @@ class SerializationError(Exception):
                         safe_checksum_info[k] = v
                     else:
                         safe_checksum_info[k] = str(v)
-                result["checksum_info"] = safe_checksum_info
+                result["checksum_info"] = cast(Any, safe_checksum_info)
         
         return result
 
