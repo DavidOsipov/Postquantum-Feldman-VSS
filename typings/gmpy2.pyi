@@ -1,19 +1,34 @@
 """
 Type stubs for gmpy2 - GNU Multiple Precision Arithmetic Library interface
-This file provides type hints for the gmpy2 library functions used in Post-Quantim Feldman's VSS.
+
+This file provides type hints for the gmpy2 library functions used in Post-Quantum Feldman's VSS.
+
+The gmpy2 library is a C-API wrapper around the GMP, MPFR, and MPC multiple-precision
+libraries. These type stubs provide Python type hints for better IDE support and type checking
+while working with arbitrary-precision arithmetic.
 """
 
-from typing import Any, Callable, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, ContextManager, Iterator, Optional, Tuple, TypeVar, Union, overload
+from types import TracebackType
+from typing_extensions import Literal, Protocol, Self, Type
 
 # Type definitions
 T = TypeVar('T')
 _mpz_type = Any  # Used to represent the concrete mpz type
 
+# Rounding modes for mpfr
+MPFR_RNDN = 0  # Round to nearest, with ties to even
+MPFR_RNDZ = 1  # Round toward zero
+MPFR_RNDU = 2  # Round toward +Inf
+MPFR_RNDD = 3  # Round toward -Inf
+MPFR_RNDA = 4  # Round away from zero
+MPFR_RNDF = 5  # Round to nearest, with ties to away (faithful rounding)
+
 class mpz:
     """Multiple precision integer type"""
     
     def __new__(cls, x: Union[int, str, float, 'mpz', 'mpfr', 'mpq', 'mpc', bytes] = 0, base: int = 0) -> 'mpz': ...
-    def __init__(self, x: Union[int, str, float, 'mpz', 'mpfr', 'mpq', 'mpc', bytes] = 0, base: int = 0) -> None: ...
+    # No __init__ needed, __new__ handles initialization
     
     def __str__(self) -> str: ...
     def __int__(self) -> int: ...
@@ -79,13 +94,24 @@ class mpz:
     @classmethod
     def from_bytes(cls, bytes_val: bytes, byteorder: str, *, signed: bool = False) -> 'mpz': ...
 
+    def as_integer_ratio(self) -> Tuple['mpz', 'mpz']: ...
+    def conjugate(self) -> 'mpz': ... # Returns self
+    @property
+    def denominator(self) -> 'mpz': ...  # Returns 1
+    @property
+    def imag(self) -> 'mpz': ...  # Returns 0
+    @property
+    def numerator(self) -> 'mpz': ...  # Returns self
+    @property
+    def real(self) -> 'mpz': ...  # Returns self
+
+
 class mpq:
     """Multiple precision rational type"""
     
     def __new__(cls, num: Union[int, str, float, 'mpz', 'mpfr', 'mpq', bytes] = 0, 
-                den: Union[int, 'mpz'] = 1, base: int = 10) -> 'mpq': ...
-    def __init__(self, num: Union[int, str, float, 'mpz', 'mpfr', 'mpq', bytes] = 0, 
-                den: Union[int, 'mpz'] = 1, base: int = 10) -> None: ...
+                den: Union[int, 'mpz'] = 1) -> 'mpq': ...
+    # No __init__ needed, __new__ handles initialization
     
     def __str__(self) -> str: ...
     def __int__(self) -> int: ...
@@ -113,16 +139,30 @@ class mpq:
     def __pos__(self) -> 'mpq': ...
     def __abs__(self) -> 'mpq': ...
     
-    def numerator(self) -> 'mpz': ...
-    def denominator(self) -> 'mpz': ...
+    def numerator(self) -> 'mpz': ... #numerator is a property in the actual class
+    def denominator(self) -> 'mpz': ... #denominator is a property in the actual class
     
+    @classmethod
+    def from_float(cls, f: float) -> 'mpq': ...
+
+    @classmethod
+    def from_decimal(cls, d: Any) -> 'mpq': ... # Assuming 'Any' is a placeholder for 'decimal.Decimal'
+    
+    def as_integer_ratio(self) -> Tuple['mpz', 'mpz']: ...
+    def conjugate(self) -> 'mpq': ...
+    @property
+    def real(self) -> 'mpq': ... # Returns self
+    @property
+    def imag(self) -> 'mpq': ... # Returns 0
+
+
 class mpfr:
     """Multiple precision floating-point type"""
     
     def __new__(cls, x: Union[int, str, float, 'mpz', 'mpfr', 'mpq', 'mpc', bytes] = 0, 
-                base: int = 0, precision: int = 0) -> 'mpfr': ...
-    def __init__(self, x: Union[int, str, float, 'mpz', 'mpfr', 'mpq', 'mpc', bytes] = 0, 
-                base: int = 0, precision: int = 0) -> None: ...
+                precision: int = 53,  # Default precision
+                rounding: int = MPFR_RNDN) -> 'mpfr': ... # Default rounding
+    # No __init__ needed, __new__ handles initialization
     
     def __str__(self) -> str: ...
     def __int__(self) -> int: ...
@@ -159,31 +199,53 @@ class mpfr:
     def is_inf(self) -> bool: ...
     def is_finite(self) -> bool: ...
     def is_signed(self) -> bool: ...
-    def precision(self) -> int: ...
+    def precision(self) -> int: ...  # precision is a property in the actual class.
+    
+    def as_integer_ratio(self) -> Tuple['mpz', 'mpz']: ...
+    def as_mantissa_exp(self) -> Tuple['mpz', int]: ...
+    def as_simple_fraction(self, precision: int = 0) -> 'mpq': ...
+    def conjugate(self) -> 'mpfr': ...  # Returns self
+    @property
+    def real(self) -> 'mpfr': ... # Returns self
+    @property
+    def imag(self) -> 'mpfr': ...  # Returns 0
+    @property
+    def rc(self) -> int: ... # Return code of the last mpfr operation
+
 
 class mpc:
     """Multi-precision complex number type"""
     
     def __new__(cls, re: Union[int, str, float, 'mpz', 'mpfr', 'mpc', bytes] = 0, 
                 im: Union[int, str, float, 'mpz', 'mpfr', 'mpc', bytes] = 0, 
-                base: int = 0, 
-                precision: int = 0) -> 'mpc': ...
+                precision: Union[int, Tuple[int, int]] = 53,
+                rounding: Union[int, Tuple[int, int]] = MPFR_RNDN) -> 'mpc': ...
     
     def __str__(self) -> str: ...
     def __repr__(self) -> str: ...
     def __bool__(self) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __format__(self, format_spec: str) -> str: ...
     
-    def __add__(self, other: Union[int, 'mpc', 'mpfr', 'mpz']) -> 'mpc': ...
-    def __radd__(self, other: Union[int, 'mpc', 'mpfr', 'mpz']) -> 'mpc': ...
-    def __sub__(self, other: Union[int, 'mpc', 'mpfr', 'mpz']) -> 'mpc': ...
-    def __rsub__(self, other: Union[int, 'mpc', 'mpfr', 'mpz']) -> 'mpc': ...
-    def __mul__(self, other: Union[int, 'mpc', 'mpfr', 'mpz']) -> 'mpc': ...
-    def __rmul__(self, other: Union[int, 'mpc', 'mpfr', 'mpz']) -> 'mpc': ...
-    def __truediv__(self, other: Union[int, 'mpc', 'mpfr', 'mpz']) -> 'mpc': ...
-    def __rtruediv__(self, other: Union[int, 'mpc', 'mpfr', 'mpz']) -> 'mpc': ...
-    def __pow__(self, other: Union[int, 'mpc', 'mpfr', 'mpz']) -> 'mpc': ...
-    def __rpow__(self, other: Union[int, 'mpc', 'mpfr', 'mpz']) -> 'mpc': ...
+    def __lt__(self, other: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> bool: ...
+    def __le__(self, other: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> bool: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+    def __gt__(self, other: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> bool: ...
+    def __ge__(self, other: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> bool: ...
+
+    def __add__(self, other: Union[int, float, 'mpz', 'mpc', 'mpfr']) -> 'mpc': ...
+    def __radd__(self, other: Union[int, float, 'mpz', 'mpc', 'mpfr']) -> 'mpc': ...
+    def __sub__(self, other: Union[int, float, 'mpz', 'mpc', 'mpfr']) -> 'mpc': ...
+    def __rsub__(self, other: Union[int, float, 'mpz', 'mpc', 'mpfr']) -> 'mpc': ...
+    def __mul__(self, other: Union[int, float, 'mpz', 'mpc', 'mpfr']) -> 'mpc': ...
+    def __rmul__(self, other: Union[int, float, 'mpz', 'mpc', 'mpfr']) -> 'mpc': ...
+    def __truediv__(self, other: Union[int, float, 'mpz', 'mpc', 'mpfr']) -> 'mpc': ...
+    def __rtruediv__(self, other: Union[int, float, 'mpz', 'mpc', 'mpfr']) -> 'mpc': ...
+    def __pow__(self, other: Union[int, float, 'mpz', 'mpc', 'mpfr']) -> 'mpc': ...
+    def __rpow__(self, other: Union[int, float, 'mpz', 'mpc', 'mpfr']) -> 'mpc': ...
     def __neg__(self) -> 'mpc': ...
+    def __pos__(self) -> 'mpc': ...
     def __abs__(self) -> 'mpfr': ...
     
     def conjugate(self) -> 'mpc': ...
@@ -191,83 +253,1414 @@ class mpc:
     def imag(self) -> 'mpfr': ...
     def phase(self) -> 'mpfr': ...
     def norm(self) -> 'mpfr': ...
+    
+    def is_finite(self) -> bool: ...
+    def is_inf(self) -> bool: ...
+    def is_nan(self) -> bool: ...
+    def is_zero(self) -> bool: ...
+    @property
+    def rc(self) -> Tuple[int, int]: ... # Return codes for real and imag parts
+
+
+# Exception types
+class Gmpy2Error(Exception): ...
+class RoundingError(Gmpy2Error): ...
+class InexactResultError(RoundingError): ...
+class UnderflowResultError(RoundingError): ...
+class OverflowResultError(RoundingError): ...
+class InvalidOperationError(Gmpy2Error): ...
+class DivisionByZeroError(Gmpy2Error, ZeroDivisionError): ...
+class RangeError(Gmpy2Error): ...
+
 
 # General functions
-def version() -> str: ...
-def mp_version() -> str: ...
-def get_cache() -> Tuple[int, int]: ...
-def set_cache(size: int, limbs: int = 1) -> Tuple[int, int]: ...
-def get_max_precision() -> int: ...
-def set_max_precision(precision: int) -> int: ...
-def get_minprec() -> int: ...
-def get_maxprec() -> int: ...
+def version() -> str: 
+    """Returns the gmpy2 version as a string."""
+    ...
+def mp_version() -> str: 
+    """Returns the GMP/MPIR version as a string."""
+    ...
+def mpc_version() -> str:
+    """Returns the MPC version as a string."""
+    ...
+def mpfr_version() -> str:
+    """Returns the MPFR version as a string."""
+    ...
+def get_cache() -> Tuple[int, int]:
+    """Returns a tuple containing the current cache settings (size, limbs)."""
+    ...
+def set_cache(size: int, limbs: int = 1) -> Tuple[int, int]:
+    """Sets the cache size and returns the old cache settings."""
+    ...
+def get_max_precision() -> int:
+    """Returns the current maximum precision for mpfr operations."""
+    ...
+def set_max_precision(precision: int) -> int:
+    """Sets the maximum precision for mpfr operations and returns the old value."""
+    ...
+def get_minprec() -> int:
+    """Returns the minimum precision supported by mpfr."""
+    ...
+def get_maxprec() -> int:
+    """Returns the maximum precision supported by mpfr."""
+    ...
+
+# Context manager for precision control
+class context:
+    """Context manager for changing precision and rounding modes locally."""
+    def __init__(self, *, 
+                 precision: Optional[int] = None,
+                 real_prec: Optional[int] = None,
+                 imag_prec: Optional[int] = None,
+                 round: Optional[int] = None,
+                 real_round: Optional[int] = None,
+                 imag_round: Optional[int] = None,
+                 subnormalize: Optional[bool] = None,
+                 trap_underflow: Optional[bool] = None,
+                 trap_overflow: Optional[bool] = None,
+                 trap_inexact: Optional[bool] = None,
+                 trap_invalid: Optional[bool] = None,
+                 trap_erange: Optional[bool] = None,
+                 trap_divzero: Optional[bool] = None,
+                 trap_expbound: Optional[bool] = None,
+                 allow_complex: bool = False,
+                 allow_release_gil: bool = False) -> None: ...
+    def __enter__(self) -> "context": ...
+    def __exit__(self, exc_type: Optional[Type[BaseException]], 
+                exc_val: Optional[BaseException], 
+                exc_tb: Optional[TracebackType]) -> None: ...
+    
+    # Context attributes (mirrors instance attributes of mpfr/mpc)
+    @property
+    def precision(self) -> int: ...
+    @precision.setter
+    def precision(self, value: int) -> None: ...
+
+    @property
+    def real_prec(self) -> int: ...
+    @real_prec.setter
+    def real_prec(self, value: int) -> None: ...
+
+    @property
+    def imag_prec(self) -> int: ...
+    @imag_prec.setter
+    def imag_prec(self, value: int) -> None: ...
+
+    @property
+    def round(self) -> int: ...
+    @round.setter
+    def round(self, value: int) -> None: ...
+
+    @property
+    def real_round(self) -> int: ...
+    @real_round.setter
+    def real_round(self, value: int) -> None: ...
+
+    @property
+    def imag_round(self) -> int: ...
+    @imag_round.setter
+    def imag_round(self, value: int) -> None: ...
+
+    @property
+    def subnormalize(self) -> bool: ...
+    @subnormalize.setter
+    def subnormalize(self, value: bool) -> None: ...
+
+    @property
+    def trap_underflow(self) -> bool: ...
+    @trap_underflow.setter
+    def trap_underflow(self, value: bool) -> None: ...
+
+    @property
+    def trap_overflow(self) -> bool: ...
+    @trap_overflow.setter
+    def trap_overflow(self, value: bool) -> None: ...
+    
+    @property
+    def trap_inexact(self) -> bool: ...
+    @trap_inexact.setter
+    def trap_inexact(self, value: bool) -> None: ...
+
+    @property
+    def trap_invalid(self) -> bool: ...
+    @trap_invalid.setter
+    def trap_invalid(self, value: bool) -> None: ...
+    
+    @property
+    def trap_erange(self) -> bool: ...
+    @trap_erange.setter
+    def trap_erange(self, value: bool) -> None: ...
+
+    @property
+    def trap_divzero(self) -> bool: ...
+    @trap_divzero.setter
+    def trap_divzero(self, value: bool) -> None: ...
+
+    @property
+    def allow_complex(self) -> bool: ...
+    @allow_complex.setter
+    def allow_complex(self, value: bool) -> None: ...
+
+    @property
+    def allow_release_gil(self) -> bool: ...
+    @allow_release_gil.setter
+    def allow_release_gil(self, value: bool) -> None: ...
+
+    # Methods to query flags (not settable)
+    @property
+    def underflow(self) -> bool: ...
+    @property
+    def overflow(self) -> bool: ...
+    @property
+    def divzero(self) -> bool: ...
+    @property
+    def inexact(self) -> bool: ...
+    @property
+    def invalid(self) -> bool: ...
+    @property
+    def erange(self) -> bool: ...
+    @property
+    def emax(self) -> int: ...
+    @property
+    def emin(self) -> int: ...
+
+    # Context methods (mirror gmpy2 functions)
+    def abs(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpz, mpfr, mpq]: ...
+    def acos(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def acosh(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def add(self, x: Union[int, float, mpz, mpfr, mpq, mpc], y: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpz, mpq, mpfr, mpc]: ...
+    def agm(self, x: Union[int, float, mpz, mpfr, mpq], y: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def ai(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def asin(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def asinh(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def atan(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def atan2(self, y: Union[int, float, mpz, mpfr, mpq], x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def atanh(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def cbrt(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def ceil(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def const_catalan(self) -> 'mpfr': ...
+    def const_euler(self) -> 'mpfr': ...
+    def const_log2(self) -> 'mpfr': ...
+    def const_pi(self) -> 'mpfr': ...
+    def cos(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def cosh(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def cot(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def coth(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def csc(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def csch(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def degrees(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def digamma(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def div(self, x: Union[int, float, mpz, mpfr, mpq, mpc], y: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpq, mpfr, mpc]: ...
+    def div_2exp(self, x: Union[int, float, mpz, mpfr, mpq, mpc], n: int) -> Union[mpfr, mpc]: ...
+    def divmod(self, x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']: ...
+    def eint(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def erf(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def erfc(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def exp(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def exp10(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def exp2(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def expm1(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def factorial(self, n: Union[int, mpz]) -> mpfr: ...
+    def floor(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def floor_div(self, x: Union[int, mpz, mpfr, mpq], y: Union[int, mpz, mpfr, mpq]) -> Union[mpz, mpfr]: ...
+    def fma(self, x: Union[int, float, mpz, mpfr, mpq, mpc], y: Union[int, float, mpz, mpfr, mpq, mpc], z: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpz, mpq, mpfr, mpc]: ...
+    def fmma(self, x: Union[int, float, mpz, mpfr, mpq], y: Union[int, float, mpz, mpfr, mpq], z: Union[int, float, mpz, mpfr, mpq], t: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def fmms(self, x: Union[int, float, mpz, mpfr, mpq], y: Union[int, float, mpz, mpfr, mpq], z: Union[int, float, mpz, mpfr, mpq], t: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def fmod(self, x: Union[int, float, mpz, mpfr, mpq], y: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def fms(self, x: Union[int, float, mpz, mpfr, mpq, mpc], y: Union[int, float, mpz, mpfr, mpq, mpc], z: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpz, mpq, mpfr, mpc]: ...
+    def frac(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def frexp(self, x: Union[int, float, mpz, mpfr, mpq]) -> Tuple[int, mpfr]: ...
+    def fsum(self, iterable: Iterator[Union[int, float, mpz, mpfr, mpq]]) -> mpfr: ...
+    def gamma(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def gamma_inc(self, a: Union[int, float, mpz, mpfr, mpq], x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def hypot(self, x: Union[int, float, mpz, mpfr, mpq], y: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def j0(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def j1(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def jn(self, n: int, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def lgamma(self, x: Union[int, float, mpz, mpfr, mpq]) -> Tuple[mpfr, int]: ...
+    def li2(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def lngamma(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def log(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def log10(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def log1p(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def log2(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def maxnum(self, x: Union[int, float, mpz, mpfr, mpq], y: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def minnum(self, x: Union[int, float, mpz, mpfr, mpq], y: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def mod(self, x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz': ...
+    def modf(self, x: Union[int, float, mpz, mpfr, mpq]) -> Tuple[mpfr, mpfr]: ...
+    def mul(self, x: Union[int, float, mpz, mpfr, mpq, mpc], y: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpz, mpq, mpfr, mpc]: ...
+    def mul_2exp(self, x: Union[int, float, mpz, mpfr, mpq, mpc], n: int) -> Union[mpfr, mpc]: ...
+    def next_above(self, x: 'mpfr') -> 'mpfr': ...
+    def next_below(self, x: 'mpfr') -> 'mpfr': ...
+    def next_toward(self, x: 'mpfr', y: 'mpfr') -> 'mpfr': ...
+    def norm(self, x: 'mpc') -> 'mpfr': ...
+    def phase(self, x: 'mpc') -> 'mpfr': ...
+    def polar(self, x: 'mpc') -> Tuple['mpfr', 'mpfr']: ...
+    def pow(self, x: Union[int, float, mpz, mpfr, mpq, mpc], y: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpz, mpq, mpfr, mpc]: ...
+    def proj(self, x: 'mpc') -> 'mpc': ...
+    def radians(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def rec_sqrt(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def reldiff(self, x: Union[int, float, mpz, mpfr, mpq], y: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def remainder(self, x: Union[int, float, mpz, mpfr, mpq], y: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def remquo(self, x: Union[int, float, mpz, mpfr, mpq], y: Union[int, float, mpz, mpfr, mpq]) -> Tuple[mpfr, int]: ...
+    def rint(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def rint_ceil(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def rint_floor(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def rint_round(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def rint_trunc(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def root(self, x: Union[int, float, mpz, mpfr, mpq], n: int) -> mpfr: ...
+    def root_of_unity(self, n: int, k: int) -> mpc: ...
+    def rootn(self, x: Union[int, float, mpz, mpfr, mpq], n: int) -> mpfr: ...
+    def round2(self, x: Union[int, float, mpz, mpfr, mpq], n: int) -> mpfr: ...
+    def round_away(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def sec(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def sech(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def sin(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def sin_cos(self, x: Union[int, float, mpz, mpfr, mpq]) -> Tuple[mpfr, mpfr]: ...
+    def sinh(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def sinh_cosh(self, x: Union[int, float, mpz, mpfr, mpq]) -> Tuple[mpfr, mpfr]: ...
+    def sqrt(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def square(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpz, mpq, mpfr, mpc]: ...
+    def sub(self, x: Union[int, float, mpz, mpfr, mpq, mpc], y: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpz, mpq, mpfr, mpc]: ...
+    def tan(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def tanh(self, x: Union[int, float, mpz, mpfr, mpq, mpc]) -> Union[mpfr, mpc]: ...
+    def trunc(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def y0(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def y1(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def yn(self, n: int, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def zeta(self, x: Union[int, float, mpz, mpfr, mpq]) -> mpfr: ...
+    def clear_flags(self) -> None: ...
+    def copy(self) -> 'context': ...
+
+class const_context:
+    """Context manager for constant creation with specific precision."""
+    def __init__(self, precision: int) -> None: ...
+    def __enter__(self) -> "const_context": ...
+    def __exit__(self, exc_type: Optional[Type[BaseException]], 
+                exc_val: Optional[BaseException], 
+                exc_tb: Optional[TracebackType]) -> None: ...
 
 # Number theoretic functions
-def powmod(x: Union[int, 'mpz'], y: Union[int, 'mpz'], m: Union[int, 'mpz']) -> 'mpz': ...
-def invert(x: Union[int, 'mpz'], m: Union[int, 'mpz']) -> 'mpz': ...
-def is_prime(x: Union[int, 'mpz'], n: int = 25) -> bool: ...
-def is_probab_prime(x: Union[int, 'mpz'], n: int = 25) -> int: ...
-def gcd(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz': ...
-def lcm(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz': ...
-def gcdext(a: Union[int, 'mpz'], b: Union[int, 'mpz']) -> Tuple['mpz', 'mpz', 'mpz']: ...
-def divm(a: Union[int, 'mpz'], b: Union[int, 'mpz'], m: Union[int, 'mpz']) -> 'mpz': ...
-def fac(n: Union[int, 'mpz']) -> 'mpz': ...
-def fib(n: Union[int, 'mpz']) -> 'mpz': ...
-def fib2(n: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']: ...
-def lucas(n: Union[int, 'mpz']) -> 'mpz': ...
-def lucas2(n: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']: ...
-def jacobi(a: Union[int, 'mpz'], b: Union[int, 'mpz']) -> int: ...
-def legendre(a: Union[int, 'mpz'], p: Union[int, 'mpz']) -> int: ...
-def kronecker(a: Union[int, 'mpz'], b: Union[int, 'mpz']) -> int: ...
-def next_prime(x: Union[int, 'mpz']) -> 'mpz': ...
-def prev_prime(x: Union[int, 'mpz']) -> 'mpz': ...
+def powmod(x: Union[int, 'mpz'], y: Union[int, 'mpz'], m: Union[int, 'mpz']) -> 'mpz':
+    """Computes (x**y) mod m efficiently.
+    
+    Args:
+        x: The base value
+        y: The exponent value
+        m: The modulus value
+    
+    Returns:
+        (x**y) mod m as an mpz object
+    
+    Raises:
+        ZeroDivisionError: If m is 0
+        ValueError: If y < 0 and x has no inverse modulo m
+    """
+    ...
+
+def invert(x: Union[int, 'mpz'], m: Union[int, 'mpz']) -> 'mpz':
+    """Computes the multiplicative inverse of x modulo m.
+    
+    Args:
+        x: The value to invert
+        m: The modulus value
+    
+    Returns:
+        y such that (x * y) mod m = 1, or 0 if no inverse exists.
+    
+    Raises:
+        ZeroDivisionError: If m is 0
+    """
+    ...
+
+def is_prime(x: Union[int, 'mpz'], n: int = 25) -> bool:
+    """Performs probabilistic primality test on x.
+    
+    Args:
+        x: The value to test for primality
+        n: Number of tests to perform (higher values increase confidence)
+    
+    Returns:
+        True if x is probably prime, False if x is definitely composite
+    """
+    ...
+
+def is_probab_prime(x: Union[int, 'mpz'], n: int = 25) -> int:
+    """Performs probabilistic primality test on x.
+    
+    Args:
+        x: The value to test for primality
+        n: Number of tests to perform
+    
+    Returns:
+        0 if x is definitely composite, 1 if x is probably prime, 2 if x is definitely prime
+    """
+    ...
+
+def gcd(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz':
+    """Computes the greatest common divisor of x and y.
+    
+    Args:
+        x: First value
+        y: Second value
+    
+    Returns:
+        The greatest common divisor of x and y as an mpz object
+    """
+    ...
+    
+def lcm(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz':
+    """Computes the least common multiple of x and y."""
+    ...
+
+def gcdext(a: Union[int, 'mpz'], b: Union[int, 'mpz']) -> Tuple['mpz', 'mpz', 'mpz']:
+    """Computes the extended GCD of a and b.
+    
+    Args:
+        a: First value
+        b: Second value
+    
+    Returns:
+        A tuple (g, s, t) where g is the GCD of a and b, and s and t are 
+        coefficients satisfying g = a*s + b*t
+    """
+    ...
+
+def divm(a: Union[int, 'mpz'], b: Union[int, 'mpz'], m: Union[int, 'mpz']) -> 'mpz':
+    """Computes (a/b) mod m, which is equivalent to (a * invert(b, m)) mod m.
+    
+    Args:
+        a: Numerator
+        b: Denominator
+        m: Modulus
+    
+    Returns:
+        (a/b) mod m as an mpz object
+    
+    Raises:
+        ZeroDivisionError: If b has no inverse modulo m or if m is 0
+    """
+    ...
+
+def fac(n: Union[int, 'mpz']) -> 'mpz':
+    """Computes the factorial of n.
+    
+    Args:
+        n: The value to compute factorial for
+    
+    Returns:
+        n! as an mpz object
+    
+    Raises:
+        ValueError: If n is negative
+    """
+    ...
+
+def fib(n: Union[int, 'mpz']) -> 'mpz':
+    """Computes the nth Fibonacci number F(n).
+    
+    Args:
+        n: The index of the Fibonacci number to compute
+    
+    Returns:
+        F(n) as an mpz object
+    """
+    ...
+
+def fib2(n: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']:
+    """Computes a tuple of Fibonacci numbers (F(n), F(n-1)).
+    
+    Args:
+        n: The index of the Fibonacci number to compute
+    
+    Returns:
+        Tuple (F(n), F(n-1)) as mpz objects
+    """
+    ...
+
+def lucas(n: Union[int, 'mpz']) -> 'mpz':
+    """Computes the nth Lucas number L(n).
+    
+    Args:
+        n: The index of the Lucas number to compute
+    
+    Returns:
+        L(n) as an mpz object
+    """
+    ...
+
+def lucas2(n: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']:
+    """Computes a tuple of Lucas numbers (L(n), L(n-1)).
+    
+    Args:
+        n: The index of the Lucas number to compute
+    
+    Returns:
+        Tuple (L(n), L(n-1)) as mpz objects
+    """
+    ...
+
+def jacobi(a: Union[int, 'mpz'], b: Union[int, 'mpz']) -> int:
+    """Computes the Jacobi symbol (a/b).
+    
+    Args:
+        a: The numerator
+        b: The denominator (must be odd and > 0)
+    
+    Returns:
+        The Jacobi symbol value (-1, 0, or 1)
+    
+    Raises:
+        ValueError: If b is even or <= 0
+    """
+    ...
+
+def legendre(a: Union[int, 'mpz'], p: Union[int, 'mpz']) -> int:
+    """Computes the Legendre symbol (a/p).
+    
+    Args:
+        a: The numerator
+        p: The denominator (must be prime)
+    
+    Returns:
+        The Legendre symbol value (-1, 0, or 1)
+    
+    Raises:
+        ValueError: If p is not prime
+    """
+    ...
+
+def kronecker(a: Union[int, 'mpz'], b: Union[int, 'mpz']) -> int:
+    """Computes the Kronecker symbol (a/b).
+    
+    Args:
+        a: The numerator
+        b: The denominator
+    
+    Returns:
+        The Kronecker symbol value (-1, 0, or 1)
+    """
+    ...
+
+def next_prime(x: Union[int, 'mpz']) -> 'mpz':
+    """Finds the next prime number greater than x.
+    
+    Args:
+        x: The starting value
+    
+    Returns:
+        The next prime number > x as an mpz object
+    """
+    ...
+
+def prev_prime(x: Union[int, 'mpz']) -> 'mpz':
+    """Finds the previous prime number less than x.
+    
+    Args:
+        x: The starting value
+    
+    Returns:
+        The previous prime number < x as an mpz object
+        
+    Raises:
+        ValueError: If no prime < x exists
+    """
+    ...
+    
+def bincoef(n: Union[int, 'mpz'], k: Union[int, 'mpz']) -> 'mpz':
+    """Computes the binomial coefficient (n choose k)."""
+    ...
+    
+def comb(n: Union[int, 'mpz'], k: Union[int, 'mpz']) -> 'mpz':
+    """Return the number of combinations of n things, taking k at a time'. k >= 0. Same as bincoef(n, k)"""
+    ...
+
+def divexact(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz':
+    """Return the quotient of x divided by y. Faster than standard division but requires the remainder is zero!"""
+    ...
+
+def double_fac(n: Union[int, 'mpz']) -> 'mpz':
+    """Return the exact double factorial (n!!) of n."""
+    ...
+
+def f2q(x: 'mpfr', err: int = 0) -> Union['mpz', 'mpq']:
+    """Return the 'best' mpq approximating x to within relative error err."""
+    ...
+
+def is_bpsw_prp(n: Union[int, 'mpz']) -> bool:
+    """Return True if n is a Baillie-Pomerance-Selfridge-Wagstaff probable prime."""
+    ...
+    
+def is_euler_prp(n: Union[int, 'mpz'], a: Union[int, 'mpz']) -> bool:
+    """Return True if n is an Euler (also known as Solovay-Strassen) probable prime to the base a."""
+    ...
+
+def is_extra_strong_lucas_prp(n: Union[int, 'mpz'], p: Union[int, 'mpz']) -> bool:
+    """Return True if n is an extra strong Lucas probable prime with parameters (p,1)."""
+    ...
+    
+def is_fermat_prp(n: Union[int, 'mpz'], a: Union[int, 'mpz']) -> bool:
+    """Return True if n is a Fermat probable prime to the base a."""
+    ...
+    
+def is_fibonacci_prp(n: Union[int, 'mpz'], p: Union[int, 'mpz'], q: Union[int, 'mpz']) -> bool:
+    """Return True if n is a Fibonacci probable prime with parameters (p,q)."""
+    ...
+
+def is_lucas_prp(n: Union[int, 'mpz'], p: Union[int, 'mpz'], q: Union[int, 'mpz']) -> bool:
+    """Return True if n is a Lucas probable prime with parameters (p,q)."""
+    ...
+    
+def is_selfridge_prp(n: Union[int, 'mpz']) -> bool:
+    """Return True if n is a Lucas probable prime with Selfidge parameters (p,q)."""
+    ...
+    
+def is_strong_bpsw_prp(n: Union[int, 'mpz']) -> bool:
+    """Return True if n is a strong Baillie-Pomerance-Selfridge-Wagstaff probable prime."""
+    ...
+
+def is_strong_lucas_prp(n: Union[int, 'mpz'], p: Union[int, 'mpz'], q: Union[int, 'mpz']) -> bool:
+    """Return True if n is a strong Lucas probable prime with parameters (p,q)."""
+    ...
+    
+def is_strong_prp(n: Union[int, 'mpz'], a: Union[int, 'mpz']) -> bool:
+    """Return True if n is a strong (also known as Miller-Rabin) probable prime to the base a."""
+    ...
+    
+def is_strong_selfridge_prp(n: Union[int, 'mpz']) -> bool:
+    """Return True if n is a strong Lucas probable prime with Selfidge parameters (p,q)."""
+    ...
+    
+def lucasu(p: Union[int, 'mpz'], q: Union[int, 'mpz'], k: Union[int, 'mpz']) -> 'mpz':
+    """Return the k-th element of the Lucas U sequence defined by p,q."""
+    ...
+
+def lucasu_mod(p: Union[int, 'mpz'], q: Union[int, 'mpz'], k: Union[int, 'mpz'], n: Union[int, 'mpz']) -> 'mpz':
+    """Return the k-th element of the Lucas U sequence defined by p,q (mod n)."""
+    ...
+    
+def lucasv(p: Union[int, 'mpz'], q: Union[int, 'mpz'], k: Union[int, 'mpz']) -> 'mpz':
+    """Return the k-th element of the Lucas V sequence defined by p,q."""
+    ...
+
+def lucasv_mod(p: Union[int, 'mpz'], q: Union[int, 'mpz'], k: Union[int, 'mpz'], n: Union[int, 'mpz']) -> 'mpz':
+    """Return the k-th element of the Lucas V sequence defined by p,q (mod n)."""
+    ...
+
+def multi_fac(n: Union[int, 'mpz'], m: Union[int, 'mpz']) -> 'mpz':
+    """Return the exact m-multi factorial of n."""
+    ...
+
+def pack(lst: list[int], n: int) -> 'mpz':
+    """Pack a list of integers lst into a single mpz."""
+    ...
+
+def powmod_base_list(base_lst: list[Union[int, 'mpz']], exp: Union[int, 'mpz'], mod: Union[int, 'mpz']) -> list['mpz']:
+    """Returns list(powmod(i, exp, mod) for i in base_lst)."""
+    ...
+
+def powmod_exp_list(base: Union[int, 'mpz'], exp_lst: list[Union[int, 'mpz']], mod: Union[int, 'mpz']) -> list['mpz']:
+    """Returns list(powmod(base, i, mod) for i in exp_lst)."""
+    ...
+    
+def powmod_sec(x: Union[int, 'mpz'], y: Union[int, 'mpz'], m: Union[int, 'mpz']) -> 'mpz':
+    """Return (x**y) mod m, using a more secure algorithm."""
+    ...
+    
+def primorial(n: Union[int, 'mpz']) -> 'mpz':
+    """Return the product of all positive prime numbers less than or equal to n."""
+    ...
+
+def remove(x: Union[int, 'mpz'], f: Union[int, 'mpz']) -> Tuple['mpz', int]:
+    """Return a 2-element tuple (y,m) such that x=y*(f**m) and f does not divide y."""
+    ...
+
+def unpack(x: Union[int, 'mpz'], n: int) -> list[int]:
+    """Unpack an integer x into a list of n-bit values."""
+    ...
 
 # Core arithmetic functions
-def add(x: Union[int, 'mpz', 'mpfr', 'mpq'], y: Union[int, 'mpz', 'mpfr', 'mpq']) -> Union['mpz', 'mpfr', 'mpq']: ...
-def sub(x: Union[int, 'mpz', 'mpfr', 'mpq'], y: Union[int, 'mpz', 'mpfr', 'mpq']) -> Union['mpz', 'mpfr', 'mpq']: ...
-def mul(x: Union[int, 'mpz', 'mpfr', 'mpq'], y: Union[int, 'mpz', 'mpfr', 'mpq']) -> Union['mpz', 'mpfr', 'mpq']: ...
-def div(x: Union[int, 'mpz', 'mpfr', 'mpq'], y: Union[int, 'mpz', 'mpfr', 'mpq']) -> Union['mpfr', 'mpq']: ...
-def divmod(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']: ...
-def mod(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz': ...
-def sqrt(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> Union['mpz', 'mpfr']: ...
-def isqrt(x: Union[int, 'mpz']) -> 'mpz': ...
-def isqrt_rem(x: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']: ...
-def square(x: Union[int, 'mpz', 'mpfr', 'mpq']) -> Union['mpz', 'mpfr', 'mpq']: ...
+def add(x: Union[int, 'mpz', 'mpfr', 'mpq', 'mpc'], y: Union[int, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpz', 'mpfr', 'mpq', 'mpc']:
+    """Adds two numbers.
+    
+    Returns a type based on the types of inputs: mpz, mpfr, or mpq.
+    """
+    ...
+
+def sub(x: Union[int, 'mpz', 'mpfr', 'mpq', 'mpc'], y: Union[int, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpz', 'mpfr', 'mpq', 'mpc']:
+    """Subtracts y from x.
+    
+    Returns a type based on the types of inputs: mpz, mpfr, or mpq.
+    """
+    ...
+
+def mul(x: Union[int, 'mpz', 'mpfr', 'mpq', 'mpc'], y: Union[int, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpz', 'mpfr', 'mpq', 'mpc']:
+    """Multiplies two numbers.
+    
+    Returns a type based on the types of inputs: mpz, mpfr, or mpq.
+    """
+    ...
+
+def div(x: Union[int, 'mpz', 'mpfr', 'mpq', 'mpc'], y: Union[int, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpfr', 'mpq', 'mpc']:
+    """Divides x by y.
+    
+    Returns mpq if both inputs are integer-like, otherwise returns mpfr.
+    
+    Raises:
+        ZeroDivisionError: If y is 0
+    """
+    ...
+
+def divmod(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']:
+    """Computes quotient and remainder of x divided by y.
+    
+    Args:
+        x: The dividend
+        y: The divisor
+    
+    Returns:
+        A tuple (q, r) where q is the quotient and r is the remainder
+        
+    Raises:
+        ZeroDivisionError: If y is 0
+    """
+    ...
+
+def mod(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz':
+    """Computes x mod y.
+    
+    Args:
+        x: The dividend
+        y: The divisor
+    
+    Returns:
+        x mod y as an mpz object
+        
+    Raises:
+        ZeroDivisionError: If y is 0
+    """
+    ...
+
+def sqrt(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpz', 'mpfr', 'mpc']:
+    """Computes the square root of x.
+    
+    Returns mpfr for most inputs. If x is a perfect square integer, it returns mpz. Returns mpc if allow_complex is True and x is negative
+    
+    Raises:
+        ValueError: If x is negative and not complex
+    """
+    ...
+
+def isqrt(x: Union[int, 'mpz']) -> 'mpz':
+    """Computes the integer square root of x (floor of sqrt(x)).
+    
+    Args:
+        x: The value to compute the integer square root for
+    
+    Returns:
+        The floor of the square root of x as an mpz object
+        
+    Raises:
+        ValueError: If x is negative
+    """
+    ...
+
+def isqrt_rem(x: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']:
+    """Computes the integer square root and remainder of x.
+    
+    Args:
+        x: The value to compute the integer square root for
+    
+    Returns:
+        A tuple (s, r) where s is the integer square root and r is the remainder
+        such that x = s*s + r
+        
+    Raises:
+        ValueError: If x is negative
+    """
+    ...
+
+def square(x: Union[int, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpz', 'mpfr', 'mpq', 'mpc']:
+    """Computes the square of x.
+    
+    Returns a type matching the input type.
+    """
+    ...
 
 # Random number generators
-def random_state(seed: Optional[Union[int, str, bytes, Any]] = None) -> Any: ...
-def mpz_random(state: Any, n: Union[int, 'mpz']) -> 'mpz': ...
-def mpz_rrandomb(state: Any, b: int) -> 'mpz': ...
-def mpz_urandomb(state: Any, b: int) -> 'mpz': ...
+def random_state(seed: Optional[Union[int, str, bytes, Any]] = None) -> Any:
+    """Creates a random state object for use with the random number generators.
+    
+    Args:
+        seed: Optional seed value (int, string, or bytes)
+    
+    Returns:
+        A random state object that can be used with the mpz_random functions
+    """
+    ...
+
+def mpz_random(state: Any, n: Union[int, 'mpz']) -> 'mpz':
+    """Generates a uniformly distributed random integer in the range [0, n-1].
+    
+    Args:
+        state: Random state object from random_state()
+        n: Upper bound (exclusive)
+    
+    Returns:
+        A random mpz in the range [0, n-1]
+    """
+    ...
+
+def mpz_rrandomb(state: Any, b: int) -> 'mpz':
+    """Generates a random integer with exactly b random bits.
+    
+    Args:
+        state: Random state object
+        b: Number of bits
+    
+    Returns:
+        A random mpz with b random bits
+    """
+    ...
+
+def mpz_urandomb(state: Any, b: int) -> 'mpz':
+    """Generates a uniformly distributed random integer in the range [0, 2^b-1].
+    
+    Args:
+        state: Random state object
+        b: Number of bits
+    
+    Returns:
+        A random mpz in the range [0, 2^b-1]
+    """
+    ...
+    
+def mpfr_grandom(state: Any) -> Tuple['mpfr', 'mpfr']:
+    """Generates two random numbers with gaussian distribution."""
+    ...
+
+def mpfr_nrandom(state: Any) -> 'mpfr':
+    """Return a random number with gaussian distribution."""
+    ...
+
+def mpfr_random(state: Any) -> 'mpfr':
+    """Return uniformly distributed number between [0,1]."""
+    ...
+    
+def mpc_random(state: Any) -> 'mpc':
+    """Return uniformly distributed number in the unit square [0,1]x[0,1]."""
+    ...
 
 # Other utility functions
-def bincoef(n: Union[int, 'mpz'], k: Union[int, 'mpz']) -> 'mpz': ...
-def hamdist(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> int: ...
-def popcount(x: Union[int, 'mpz']) -> int: ...
-def xmpz_popcount(x: Union[int, 'mpz']) -> int: ...
-def bit_mask(n: int) -> 'mpz': ...
+
+def hamdist(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> int:
+    """Computes the Hamming distance between x and y.
+    
+    The Hamming distance is the number of bit positions where x and y differ.
+    
+    Args:
+        x: First value
+        y: Second value
+    
+    Returns:
+        The Hamming distance as an integer
+    """
+    ...
+
+def popcount(x: Union[int, 'mpz']) -> int:
+    """Counts the number of 1-bits in the binary representation of x.
+    
+    Args:
+        x: The value to count bits in
+    
+    Returns:
+        The number of 1-bits in x
+    """
+    ...
+
+def xmpz_popcount(x: Union[int, 'mpz']) -> int:
+    """Counts the number of 1-bits in the binary representation of x.
+    
+    Args:
+        x: The value to count bits in
+    
+    Returns:
+        The number of 1-bits in x
+    """
+    ...
+
+def bit_mask(n: int) -> 'mpz':
+    """Creates a bit mask with n 1-bits.
+    
+    Args:
+        n: Number of bits (must be >= 0)
+    
+    Returns:
+        mpz value with the n lowest bits set to 1
+        
+    Raises:
+        ValueError: If n < 0
+    """
+    ...
 
 # MPFR specific functions
-def const_log2() -> 'mpfr': ...
-def const_pi() -> 'mpfr': ...
-def const_euler() -> 'mpfr': ...
-def const_catalan() -> 'mpfr': ...
-def log(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], base: Optional[Union[int, float, 'mpz', 'mpfr']] = None) -> 'mpfr': ...
-def exp(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr': ...
-def sin(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr': ...
-def cos(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr': ...
-def tan(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr': ...
-def atan(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr': ...
-def sinh(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr': ...
-def cosh(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr': ...
-def tanh(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr': ...
-def atanh(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr': ...
+def const_log2(precision: int = 0) -> 'mpfr':
+    """Returns the natural logarithm of 2 with specified precision."""
+    ...
 
-# Internal support for mpmath
+def const_pi(precision: int = 0) -> 'mpfr':
+    """Returns the value of pi with specified precision."""
+    ...
+
+def const_euler(precision: int = 0) -> 'mpfr':
+    """Returns Euler's constant with specified precision."""
+    ...
+
+def const_catalan(precision: int = 0) -> 'mpfr':
+    """Returns Catalan's constant with specified precision."""
+    ...
+
+@overload
+def log(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpfr', 'mpc']: ...
+
+@overload
+def log(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], base: Union[int, float, 'mpz', 'mpfr']) -> 'mpfr': ...
+
+def log(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc'], base: Optional[Union[int, float, 'mpz', 'mpfr']] = None) -> Union['mpfr', 'mpc']:
+    """Computes the logarithm of x to the specified base.
+    
+    If base is None, returns the natural logarithm.
+    
+    Args:
+        x: The value to compute logarithm for (must be > 0)
+        base: The logarithm base (must be > 0 and != 1)
+    
+    Returns:
+        The logarithm as an mpfr object
+        
+    Raises:
+        ValueError: If x <= 0 or base <= 0 or base == 1
+    """
+    ...
+
+def exp(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpfr', 'mpc']:
+    """Computes the exponential function e^x.
+    
+    Args:
+        x: The exponent
+    
+    Returns:
+        e^x as an mpfr object
+    """
+    ...
+
+def sin(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpfr', 'mpc']:
+    """Computes the sine of x.
+    
+    Args:
+        x: Angle in radians
+    
+    Returns:
+        sin(x) as an mpfr object
+    """
+    ...
+
+def cos(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpfr', 'mpc']:
+    """Computes the cosine of x.
+    
+    Args:
+        x: Angle in radians
+    
+    Returns:
+        cos(x) as an mpfr object
+    """
+    ...
+
+def tan(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpfr', 'mpc']:
+    """Computes the tangent of x.
+    
+    Args:
+        x: Angle in radians
+    
+    Returns:
+        tan(x) as an mpfr object
+    """
+    ...
+
+def atan(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpfr', 'mpc']:
+    """Computes the arctangent of x.
+    
+    Args:
+        x: Value to compute arctangent for
+    
+    Returns:
+        atan(x) as an mpfr object
+    """
+    ...
+
+def atan2(y: Union[int, float, 'mpz', 'mpfr', 'mpq'], x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Computes the two-argument arctangent of y/x.
+    
+    Args:
+        y: The y-coordinate
+        x: The x-coordinate
+    
+    Returns:
+        atan2(y, x) as an mpfr object
+    """
+    ...
+
+def sinh(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpfr', 'mpc']:
+    """Computes the hyperbolic sine of x.
+    
+    Args:
+        x: Value to compute hyperbolic sine for
+    
+    Returns:
+        sinh(x) as an mpfr object
+    """
+    ...
+
+def cosh(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpfr', 'mpc']:
+    """Computes the hyperbolic cosine of x.
+    
+    Args:
+        x: Value to compute hyperbolic cosine for
+    
+    Returns:
+        cosh(x) as an mpfr object
+    """
+    ...
+
+def tanh(x: Union[int, float, 'mpz', 'mpfr', 'mpq', 'mpc']) -> Union['mpfr', 'mpc']:
+    """Computes the hyperbolic tangent of x.
+    
+    Args:
+        x: Value to compute hyperbolic tangent for
+    
+    Returns:
+        tanh(x) as an mpfr object
+    """
+    ...
+
+def atanh(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Computes the inverse hyperbolic tangent of x.
+    
+    Args:
+        x: Value to compute inverse hyperbolic tangent for (|x| < 1)
+    
+    Returns:
+        atanh(x) as an mpfr object
+        
+    Raises:
+        ValueError: If |x| >= 1
+    """
+    ...
+
+def asin(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Computes the arcsine of x.
+    
+    Args:
+        x: Value to compute arcsine for (|x| <= 1)
+    
+    Returns:
+        asin(x) as an mpfr object
+        
+    Raises:
+        ValueError: If |x| > 1
+    """
+    ...
+
+def acos(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Computes the arccosine of x.
+    
+    Args:
+        x: Value to compute arccosine for (|x| <= 1)
+    
+    Returns:
+        acos(x) as an mpfr object
+        
+    Raises:
+        ValueError: If |x| > 1
+    """
+    ...
+
+def asinh(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Computes the inverse hyperbolic sine of x.
+    
+    Args:
+        x: Value to compute inverse hyperbolic sine for
+    
+    Returns:
+        asinh(x) as an mpfr object
+    """
+    ...
+
+def acosh(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Computes the inverse hyperbolic cosine of x.
+    
+    Args:
+        x: Value to compute inverse hyperbolic cosine for (x >= 1)
+    
+    Returns:
+        acosh(x) as an mpfr object
+        
+    Raises:
+        ValueError: If x < 1
+    """
+    ...
+
+def floor(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> Union['mpz', 'mpfr']:
+    """Computes the floor of x (largest integer not greater than x).
+    
+    Args:
+        x: Value to compute floor for
+    
+    Returns:
+        floor(x) as mpz if x is integer-like, otherwise as mpfr
+    """
+    ...
+
+def ceil(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> Union['mpz', 'mpfr']:
+    """Computes the ceiling of x (smallest integer not less than x).
+    
+    Args:
+        x: Value to compute ceiling for
+    
+    Returns:
+        ceil(x) as mpz if x is integer-like, otherwise as mpfr
+    """
+    ...
+
+def trunc(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> Union['mpz', 'mpfr']:
+    """Truncates x towards zero.
+    
+    Args:
+        x: Value to truncate
+    
+    Returns:
+        trunc(x) as mpz if x is integer-like, otherwise as mpfr
+    """
+    ...
+
+def round2(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], n: int = 0) -> 'mpfr':
+    """Rounds x to the nearest multiple of 2^n.
+    
+    Args:
+        x: Value to round
+        n: Determines the precision of rounding (defaults to 0)
+    
+    Returns:
+        Rounded value as mpfr
+    """
+    ...
+
+def round_away(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> Union['mpz', 'mpfr']:
+    """Rounds x to the nearest integer, away from 0 in case of a tie.
+    
+    Args:
+        x: Value to round
+    
+    Returns:
+        Rounded value as mpz if x is integer-like, otherwise as mpfr
+    """
+    ...
+
+def fmod(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], y: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Computes the floating-point remainder of x/y with the same sign as x.
+    
+    Args:
+        x: Dividend
+        y: Divisor
+    
+    Returns:
+        Floating-point remainder as mpfr
+        
+    Raises:
+        ZeroDivisionError: If y is 0
+    """
+    ...
+
+def remainder(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], y: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Computes the IEEE remainder of x/y.
+    
+    Args:
+        x: Dividend
+        y: Divisor
+    
+    Returns:
+        IEEE remainder as mpfr
+        
+    Raises:
+        ZeroDivisionError: If y is 0
+    """
+    ...
+
+def remquo(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], y: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> Tuple['mpfr', int]:
+    """Computes the remainder and low bits of the quotient."""
+    ...
+
+def rint(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Rounds x to the nearest integer, using current rounding mode."""
+    ...
+
+def rint_ceil(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Rounds x to the nearest integer, rounding up."""
+    ...
+    
+def rint_floor(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Rounds x to the nearest integer, rounding down"""
+    ...
+    
+def rint_round(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Rounds x to the nearest integer, rounding away from 0 for ties."""
+    ...
+
+def rint_trunc(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Rounds x to the nearest integer, rounding towards zero."""
+    ...
+    
+def root_of_unity(n: int, k: int) -> 'mpc':
+    """Return the n-th root of mpc(1) raised to the k-th power."""
+    ...
+
+def c_div(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz':
+    """Return the quotient of x divided by y, rounded towards +Inf (ceiling rounding)."""
+    ...
+    
+def c_div_2exp(x: Union[int, 'mpz'], n: int) -> 'mpz':
+    """Returns the quotient of x divided by 2**n, rounded towards +Inf (ceiling rounding)."""
+    ...
+
+def c_divmod(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']:
+    """Return the quotient and remainder of x divided by y, quotient rounded towards +Inf (ceiling rounding)."""
+    ...
+    
+def c_divmod_2exp(x: Union[int, 'mpz'], n: int) -> Tuple['mpz', 'mpz']:
+    """Return the quotient and remainder of x divided by 2**n, quotient rounded towards +Inf (ceiling rounding)"""
+    ...
+    
+def c_mod(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz':
+    """Return the remainder of x divided by y. The remainder will have the opposite sign of y."""
+    ...
+    
+def c_mod_2exp(x: Union[int, 'mpz'], n: int) -> 'mpz':
+    """Return the remainder of x divided by 2**n. The remainder will be negative."""
+    ...
+
+def f_div(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz':
+    """Return the quotient of x divided by y, rounded towards -Inf (floor rounding)."""
+    ...
+
+def f_div_2exp(x: Union[int, 'mpz'], n: int) -> 'mpz':
+    """Return the quotient of x divided by 2**n, rounded towards -Inf (floor rounding)."""
+    ...
+    
+def f_divmod(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']:
+    """Return the quotient and remainder of x divided by y, quotient rounded towards -Inf (floor rounding)."""
+    ...
+
+def f_divmod_2exp(x: Union[int, 'mpz'], n: int) -> Tuple['mpz', 'mpz']:
+    """Return the quotient and remainder of x divided by 2**n, quotient rounded towards -Inf (floor rounding)."""
+    ...
+
+def f_mod(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz':
+    """Return the remainder of x divided by y. The remainder will have the same sign as y."""
+    ...
+
+def f_mod_2exp(x: Union[int, 'mpz'], n: int) -> 'mpz':
+     """Return remainder of x divided by 2**n. The remainder will be positive."""
+     ...
+     
+def t_div(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz':
+    """Return the quotient of x divided by y, rounded towards 0."""
+    ...
+
+def t_div_2exp(x: Union[int, 'mpz'], n: int) -> 'mpz':
+    """Return the quotient of x divided by 2**n, rounded towards zero (truncation)."""
+    ...
+
+def t_divmod(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> Tuple['mpz', 'mpz']:
+    """Return the quotient and remainder of x divided by y, quotient rounded towards zero (truncation)"""
+    ...
+    
+def t_divmod_2exp(x: Union[int, 'mpz'], n: int) -> Tuple['mpz', 'mpz']:
+    """Return the quotient and remainder of x divided by 2**n, quotient rounded towards zero (truncation)."""
+    ...
+
+def t_mod(x: Union[int, 'mpz'], y: Union[int, 'mpz']) -> 'mpz':
+    """Return the remainder of x divided by y. The remainder will have the same sign as x."""
+    ...
+    
+def t_mod_2exp(x: Union[int, 'mpz'], n: int) -> 'mpz':
+    """Return the remainder of x divided by 2**n. The remainder will have the same sign as x."""
+    ...
+
+def cbrt(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return the cube root of x."""
+    ...
+    
+def digamma(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return digamma of x."""
+    ...
+    
+def eint(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return exponential integral of x."""
+    ...
+
+def erf(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return error function of x."""
+    ...
+    
+def erfc(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return complementary error function of x."""
+    ...
+    
+def exp10(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return 10**x."""
+    ...
+
+def exp2(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return 2**x."""
+    ...
+    
+def expm1(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return exp(x) - 1."""
+    ...
+
+def fmma(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], y: Union[int, float, 'mpz', 'mpfr', 'mpq'], z: Union[int, float, 'mpz', 'mpfr', 'mpq'], t: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return correctly rounded result of (x * y) + (z * t)."""
+    ...
+
+def fmms(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], y: Union[int, float, 'mpz', 'mpfr', 'mpq'], z: Union[int, float, 'mpz', 'mpfr', 'mpq'], t: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return correctly rounded result of (x * y) - (z * t)."""
+    ...
+    
+def frexp(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> Tuple[int, 'mpfr']:
+    """Return a tuple containing the exponent and mantissa of x."""
+    ...
+
+def fsum(iterable: Iterator[Union[int, float, 'mpz', 'mpfr', 'mpq']]) -> 'mpfr':
+    """Return an accurate sum of the values in the iterable."""
+    ...
+
+def gamma(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return gamma of x."""
+    ...
+
+def gamma_inc(a: Union[int, float, 'mpz', 'mpfr', 'mpq'], x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return (upper) incomplete gamma of a and x."""
+    ...
+
+def hypot(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], y: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return square root of (x**2 + y**2)."""
+    ...
+    
+def j0(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return first kind Bessel function of order 0 of x."""
+    ...
+
+def j1(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return first kind Bessel function of order 1 of x."""
+    ...
+
+def jn(n: int, x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return the first kind Bessel function of order n of x."""
+    ...
+    
+def lgamma(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> Tuple['mpfr', int]:
+    """Return a tuple containing the logarithm of the absolute value of gamma(x) and the sign of gamma(x)"""
+    ...
+
+def li2(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return real part of dilogarithm of x."""
+    ...
+
+def lngamma(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return natural logarithm of gamma(x)."""
+    ...
+
+def log1p(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return natural logarithm of (1+x)."""
+    ...
+    
+def maxnum(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], y: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return the maximum number of x and y."""
+    ...
+
+def minnum(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], y: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return the minimum number of x and y."""
+    ...
+    
+def reldiff(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], y: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return the relative difference between x and y."""
+    ...
+
+def root(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], n: int) -> 'mpfr':
+    """Return n-th root of x."""
+    ...
+
+def rootn(x: Union[int, float, 'mpz', 'mpfr', 'mpq'], n: int) -> 'mpfr':
+    """Return n-th root of x."""
+    ...
+
+def sec(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return secant of x; x in radians."""
+    ...
+
+def sech(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return hyperbolic secant of x."""
+    ...
+    
+def sin_cos(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> Tuple['mpfr', 'mpfr']:
+    """Return a tuple containing the sine and cosine of x; x in radians."""
+    ...
+
+def sinh_cosh(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> Tuple['mpfr', 'mpfr']:
+    """Return a tuple containing the hyperbolic sine and cosine of x."""
+    ...
+    
+def y0(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return second kind Bessel function of order 0 of x."""
+    ...
+    
+def y1(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return second kind Bessel function of order 1 of x."""
+    ...
+
+def yn(n: int, x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return the second kind Bessel function of order n of x."""
+    ...
+
+def zeta(x: Union[int, float, 'mpz', 'mpfr', 'mpq']) -> 'mpfr':
+    """Return Riemann zeta of x."""
+    ...
+
+def qdiv(x: Union[int, 'mpz', 'mpq'], y: Union[int, 'mpz', 'mpq'] = 1) -> Union['mpz', 'mpq']:
+    """Return x/y as mpz if possible, or as mpq if x is not exactly divisible by y."""
+    ...
+
+def ieee(size: int, subnormalize: bool = True) -> context:
+    """Return a new context corresponding to a standard IEEE floating-point format."""
+    ...
+
+def local_context(**kwargs: Any) -> context:
+    """Return a new context for controlling gmpy2 arithmetic, based either on the current context or on a ctx value."""
+    ...
+    
+def set_context(context: context) -> None:
+    """Activate a context object controlling gmpy2 arithmetic."""
+    ...
+
+# Constants (should be ALL_CAPS to follow convention)
+#  (These are placeholders. In reality, they are likely implemented differently)
+MACHINE_BITS: int
+
+# Internal support for mpmath (marked as internal with leading underscore)
 _mpmath_create: Callable[..., Any]
 _mpmath_normalize: Callable[..., Any]
 
-# Internal C API
+# Internal C API (marked as internal)
 _C_API: Any
 
 # Constants
@@ -276,16 +1669,68 @@ __libgmp_version__: str
 __libmpfr_version__: str
 __libmpc_version__: str
 
-# For IDE autocompletion
+
+# For IDE autocompletion and to make the linter happy.
 __all__ = [
-    'mpz', 'mpq', 'mpfr', 'mpc', 'add', 'sub', 'mul', 'div', 'divmod', 'mod',
-    'powmod', 'invert', 'is_prime', 'gcd', 'lcm', 'sqrt', 'isqrt', 'square',
-    'random_state', 'version', 'mp_version', 'get_cache', 'set_cache',
-    'is_probab_prime', 'next_prime', 'prev_prime', 'jacobi', 'legendre',
-    'kronecker', 'gcdext', 'divm', 'fac', 'bincoef', 'fib', 'fib2', 'lucas', 'lucas2',
-    'hamdist', 'popcount', 'bit_mask', 'const_log2', 'const_pi', 'const_euler',
-    'const_catalan', 'log', 'exp', 'sin', 'cos', 'tan', 'atan', 'sinh', 'cosh', 
-    'tanh', 'atanh', 'mpz_random', 'mpz_rrandomb', 'mpz_urandomb',
+    # Classes
+    'mpz', 'mpq', 'mpfr', 'mpc', 'context',
+    
+    # Context managers
+    'local_context', 'const_context', 'context',
+    
+    # Core arithmetic functions
+    'add', 'sub', 'mul', 'div', 'divmod', 'mod', 'sqrt', 'isqrt', 'isqrt_rem', 'square',
+    
+    # Number theoretic functions
+    'powmod', 'invert', 'is_prime', 'is_probab_prime', 'gcd', 'lcm', 'gcdext', 'divm',
+    'fac', 'bincoef', 'fib', 'fib2', 'lucas', 'lucas2', 'jacobi', 'legendre',
+    'kronecker', 'next_prime', 'prev_prime', 'comb', 'divexact', 'double_fac',
+    'f2q', 'is_bpsw_prp', 'is_euler_prp', 'is_extra_strong_lucas_prp',
+    'is_fermat_prp', 'is_fibonacci_prp', 'is_lucas_prp',
+    'is_selfridge_prp', 'is_strong_bpsw_prp', 'is_strong_lucas_prp',
+    'is_strong_prp', 'is_strong_selfridge_prp', 'lucasu', 'lucasu_mod',
+    'lucasv', 'lucasv_mod', 'multi_fac', 'pack', 'powmod_base_list',
+    'powmod_exp_list', 'powmod_sec', 'primorial', 'remove', 'unpack',
+    'c_div', 'c_div_2exp', 'c_divmod', 'c_divmod_2exp', 'c_mod',
+    'c_mod_2exp', 'f_div', 'f_div_2exp', 'f_divmod', 'f_divmod_2exp',
+    'f_mod', 'f_mod_2exp', 't_div', 't_div_2exp', 't_divmod',
+    't_divmod_2exp', 't_mod', 't_mod_2exp', 'cbrt', 'digamma', 'eint',
+    'erf', 'erfc', 'exp10', 'exp2', 'expm1', 'fmma', 'fmms', 'frexp', 'fsum',
+    'gamma', 'gamma_inc', 'hypot', 'j0', 'j1', 'jn', 'lgamma', 'li2',
+    'lngamma', 'log1p', 'maxnum', 'minnum', 'reldiff', 'root', 'rootn',
+    'sec', 'sech', 'sin_cos', 'sinh_cosh', 'y0', 'y1', 'yn', 'zeta', 'qdiv',
+    'ieee', 'local_context', 'set_context',
+
+    
+    # Random number generators
+    'random_state', 'mpz_random', 'mpz_rrandomb', 'mpz_urandomb',
+    'mpfr_grandom', 'mpfr_nrandom', 'mpfr_random', 'mpc_random',
+    
+    # Utility functions
+    'hamdist', 'popcount', 'xmpz_popcount', 'bit_mask', 
+    
+    # MPFR constants and functions
+    'const_log2', 'const_pi', 'const_euler', 'const_catalan',
+    'log', 'exp', 'sin', 'cos', 'tan', 'atan', 'atan2', 'sinh', 'cosh', 'tanh', 'atanh',
+    'asin', 'acos', 'asinh', 'acosh', 'floor', 'ceil', 'trunc', 'round2', 'round_away',
+    'fmod', 'remainder', 'remquo', 'rint', 'rint_ceil', 'rint_floor',
+    'rint_round', 'rint_trunc', 'root_of_unity',
+
+    
+    # Library information
+    'version', 'mp_version', 'get_cache', 'set_cache', 'get_max_precision', 'set_max_precision',
+    'get_minprec', 'get_maxprec', 'mpc_version', 'mpfr_version',
+    
+    # Version strings
     '__version__', '__libgmp_version__', '__libmpfr_version__', '__libmpc_version__',
-    '_mpmath_create', '_mpmath_normalize', '_C_API'
+    
+    # Internal APIs
+    '_mpmath_create', '_mpmath_normalize', '_C_API',
+    
+    # Rounding Modes
+    'MPFR_RNDN', 'MPFR_RNDZ', 'MPFR_RNDU', 'MPFR_RNDD', 'MPFR_RNDA', 'MPFR_RNDF',
+    
+    # Exceptions
+    'Gmpy2Error', 'RoundingError', 'InexactResultError', 'UnderflowResultError',
+    'OverflowResultError', 'InvalidOperationError', 'DivisionByZeroError', 'RangeError'
 ]
