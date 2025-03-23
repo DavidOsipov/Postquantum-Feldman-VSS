@@ -781,41 +781,56 @@ def constant_time_compare(a: Union[int, str, bytes, "gmpy2.mpz"], b: Union[int, 
         >>> constant_time_compare(gmpy2.mpz(101), 101)
         True
     """
-    # Input validation
+    # Input validation - maintaining constant time throughout
     if a is None or b is None:
         return False
-
+    
     # Optimize for identical objects (safe shortcut that doesn't affect timing security)
     if a is b:
         return True
-        
-    # Normalize mpz types to int
-    if isinstance(a, gmpy2.mpz):
-        a = int(a)
-    if isinstance(b, gmpy2.mpz):
-        b = int(b)
-        
-    # Convert to bytes for consistent handling
+    
+    # Initialize result variable to track mismatches
+    result: int = 0
+    unequal_types: bool = False
+    sign_mismatch: bool = False
+    
     try:
+        # First, check types and normalize data - this is where we deviate from
+        # strict constant-time, but we'll attempt to minimize leakage
+        
+        # Check for gmpy2 types and normalize
+        a_is_mpz = isinstance(a, gmpy2.mpz)
+        b_is_mpz = isinstance(b, gmpy2.mpz)
+        
+        if a_is_mpz:
+            a = int(a)
+        if b_is_mpz:
+            b = int(b)
+        
+        # Pre-check for type differences without early returns
+        a_type = type(a)
+        b_type = type(b)
+        unequal_types = a_type is not b_type
+        
+        # Pre-check for sign differences in integers without early returns
         if isinstance(a, int) and isinstance(b, int):
-            # For integers, handle negative values securely
-            if (a < 0) != (b < 0):  # Different signs
-                return False
-                
-            # For integers, ensure same bit length with padding
-            a_bits: int = a.bit_length() if hasattr(a, "bit_length") and a != 0 else 0
-            b_bits: int = b.bit_length() if hasattr(b, "bit_length") and b != 0 else 0
+            sign_mismatch = (a < 0) != (b < 0)
+            
+            # Compute bit lengths securely
+            a_bits = a.bit_length() if a != 0 else 0
+            b_bits = b.bit_length() if b != 0 else 0
             
             # Protect against DOS with excessive memory allocation
             if max(a_bits, b_bits) > 1_000_000:  # Reasonable upper limit
                 raise ValueError("Integer values too large for secure comparison")
                 
-            bit_length: int = max(a_bits, b_bits, 8)  # Minimum 8 bits
-            byte_length: int = (bit_length + 7) // 8
+            # Fixed minimum bit length to prevent zero-length issues
+            bit_length = max(a_bits, b_bits, 8)  # Minimum 8 bits
+            byte_length = (bit_length + 7) // 8
             
-            # Convert to bytes with same length
-            a_bytes: bytes = abs(a).to_bytes(byte_length, byteorder="big")
-            b_bytes: bytes = abs(b).to_bytes(byte_length, byteorder="big")
+            # Convert to bytes with same length using absolute values
+            a_bytes = abs(a).to_bytes(byte_length, byteorder="big")
+            b_bytes = abs(b).to_bytes(byte_length, byteorder="big")
             
         elif isinstance(a, str) and isinstance(b, str):
             a_bytes = a.encode(encoding="utf-8")
@@ -827,41 +842,44 @@ def constant_time_compare(a: Union[int, str, bytes, "gmpy2.mpz"], b: Union[int, 
             
         else:
             # For mixed types, use a consistent conversion approach
-            # Note: This branch is less secure for timing, but necessary for flexibility
+            # We'll detect this condition but still perform the comparison
+            unequal_types = True
             a_bytes = str(a).encode(encoding="utf-8")
             b_bytes = str(b).encode(encoding="utf-8")
-            
+        
         # Protect against DOS with excessive memory allocation
         if max(len(a_bytes), len(b_bytes)) > 10_000_000:  # 10MB limit
             raise ValueError("Input values too large for secure comparison")
-            
-        # Handle different lengths with a padded comparison
-        # to maintain constant time behavior
-        max_len: int = max(len(a_bytes), len(b_bytes))
+        
+        # Always pad to same length regardless of original size
+        max_len = max(len(a_bytes), len(b_bytes))
         a_bytes = a_bytes.ljust(max_len, b"\0")
         b_bytes = b_bytes.ljust(max_len, b"\0")
         
-        # Constant-time comparison with the full length
-        result: int = 0
-        
-        # Perform two passes to further mask timing differences
-        # First pass - standard XOR comparison
+        # Constant-time comparison - no early returns
+        # First pass: XOR comparison
         for x, y in zip(a_bytes, b_bytes):
             result |= x ^ y
             
-        # Redundant second pass to mask CPU-level optimizations and cache effects
-        # The 'dummy' variable is intentionally unused - its calculation serves
-        # to normalize execution time against sophisticated timing attacks
-        dummy: int = 0
+        # Redundant second pass with different operation to mask CPU optimizations
+        dummy = 0
         for x, y in zip(a_bytes, b_bytes):
             dummy |= x & y
             
-        # Final result is 0 only if all bytes matched
+        # Incorporate sign and type mismatches into final result WITHOUT early returns
+        if sign_mismatch:
+            result |= 1
+        if unequal_types:
+            result |= 1
+            
+        # Final result is true only if all checks passed
         return result == 0
         
     except (ValueError, TypeError, OverflowError) as e:
-        # Log error for debugging but maintain security by returning False
-        logger.debug(f"Error in constant_time_compare: {e}")
+        # Log error but maintain security
+        error_msg = f"Error in constant_time_compare: {e}"
+        sanitized_msg = sanitize_error(error_msg, detailed_message=error_msg)
+        logger.debug(sanitized_msg)
         return False
 
 def validate_timestamp(timestamp: Optional[int], max_future_drift: int = MAX_TIME_DRIFT,
@@ -1573,6 +1591,100 @@ def secure_redundant_execution(
         else:
             raise SecurityError(message) from e
 
+def sanitize_error(message: str, detailed_message: Optional[str] = None, sanitize: bool = True) -> str:
+    """
+    Description:
+        Sanitize error messages for security purposes.
+
+    Arguments:
+        message (str): The original error message.
+        detailed_message (str, optional): Detailed information to log but not expose.
+        sanitize (bool): Whether to sanitize the message or return it as-is. Default is True.
+
+    Outputs:
+        str: The sanitized message for external use.
+    """
+    if detailed_message:
+        logger.error(detailed_message)
+
+    if not sanitize:
+        return message
+
+    # Generic messages for different error categories
+    message_lower: str = message.lower()
+
+    # Enhanced categories for better coverage
+    if any(
+        keyword in message_lower
+        for keyword in ["insufficient", "quorum", "threshold", "not enough"]
+    ):
+        return "Security verification failed - share refresh aborted"
+
+    if any(
+        keyword in message_lower
+        for keyword in [
+            "deserialized",
+            "unpacked",
+            "decode",
+            "format",
+            "structure",
+        ]
+    ):
+        return "Verification of cryptographic parameters failed"
+
+    if any(
+        keyword in message_lower
+        for keyword in [
+            "tampering",
+            "checksum",
+            "integrity",
+            "modified",
+            "corrupted",
+        ]
+    ):
+        return "Data integrity check failed"
+
+    if any(
+        keyword in message_lower
+        for keyword in ["byzan", "fault", "malicious", "attack", "adversary"]
+    ):
+        return "Protocol security violation detected"
+
+    if any(
+        keyword in message_lower
+        for keyword in ["verify", "verif", "commit", "invalid", "mismatch"]
+    ):
+        return "Cryptographic verification failed"
+
+    if any(
+        keyword in message_lower
+        for keyword in ["prime", "generator", "arithmetic", "computation"]
+    ):
+        return "Cryptographic parameter validation failed"
+
+    if any(
+        keyword in message_lower for keyword in ["timeout", "expired", "future"]
+    ):
+        return "Security timestamp verification failed"
+
+    # Additional categories for better coverage
+    if any(
+        keyword in message_lower
+        for keyword in ["singular", "solve", "matrix", "gauss"]
+    ):
+        return "Matrix operation failed during cryptographic computation"
+
+    if any(
+        keyword in message_lower
+        for keyword in ["party", "participant", "diagnostics"]
+    ):
+        return "Participant verification failed"
+
+    if any(keyword in message_lower for keyword in ["hash", "blake3", "sha3"]):
+        return "Hash operation failed"
+
+    # Default generic message
+    return "Cryptographic operation failed"
 
 class MemoryMonitor:
     """
@@ -2578,87 +2690,7 @@ class FeldmanVSS:
         Outputs:
             str: The sanitized message for external use.
         """
-        if detailed_message:
-            logger.error(detailed_message)
-
-        if self.config.sanitize_errors:
-            # Generic messages for different error categories
-            message_lower: str = message.lower()
-
-            # Enhanced categories for better coverage
-            if any(
-                keyword in message_lower
-                for keyword in ["insufficient", "quorum", "threshold", "not enough"]
-            ):
-                return "Security verification failed - share refresh aborted"
-
-            if any(
-                keyword in message_lower
-                for keyword in [
-                    "deserialized",
-                    "unpacked",
-                    "decode",
-                    "format",
-                    "structure",
-                ]
-            ):
-                return "Verification of cryptographic parameters failed"
-
-            if any(
-                keyword in message_lower
-                for keyword in [
-                    "tampering",
-                    "checksum",
-                    "integrity",
-                    "modified",
-                    "corrupted",
-                ]
-            ):
-                return "Data integrity check failed"
-
-            if any(
-                keyword in message_lower
-                for keyword in ["byzan", "fault", "malicious", "attack", "adversary"]
-            ):
-                return "Protocol security violation detected"
-
-            if any(
-                keyword in message_lower
-                for keyword in ["verify", "verif", "commit", "invalid", "mismatch"]
-            ):
-                return "Cryptographic verification failed"
-
-            if any(
-                keyword in message_lower
-                for keyword in ["prime", "generator", "arithmetic", "computation"]
-            ):
-                return "Cryptographic parameter validation failed"
-
-            if any(
-                keyword in message_lower for keyword in ["timeout", "expired", "future"]
-            ):
-                return "Security timestamp verification failed"
-
-            # Additional categories for better coverage
-            if any(
-                keyword in message_lower
-                for keyword in ["singular", "solve", "matrix", "gauss"]
-            ):
-                return "Matrix operation failed during cryptographic computation"
-
-            if any(
-                keyword in message_lower
-                for keyword in ["party", "participant", "diagnostics"]
-            ):
-                return "Participant verification failed"
-
-            if any(keyword in message_lower for keyword in ["hash", "blake3", "sha3"]):
-                return "Hash operation failed"
-
-            # Default generic message
-            return "Cryptographic operation failed"
-        else:
-            return message
+        return sanitize_error(message, detailed_message, sanitize=self.config.sanitize_errors)
 
     def _raise_sanitized_error(self, error_class: Type[Exception], message: str, detailed_message: Optional[str] = None) -> NoReturn:
         """
@@ -2831,9 +2863,8 @@ class FeldmanVSS:
 
         r_i: FieldElement
         for r_i in randomizers:
-            r_combined = (r_combined + gmpy2.mpz(r_i) * x_power) % self.group.prime
-            x_power = (x_power * gmpy2.mpz(x)) % self.group.prime
-
+            r_combined = gmpy2.mpz(gmpy2.f_mod(gmpy2.mpz(r_combined) + gmpy2.mpz(r_i) * gmpy2.mpz(x_power), gmpy2.mpz(self.group.prime)))
+            x_power = gmpy2.mpz(gmpy2.f_mod(gmpy2.mpz(x_power) * gmpy2.mpz(x), gmpy2.mpz(self.group.prime)))
         return r_combined
 
     def _compute_expected_commitment(self, commitments: List[Union[Tuple[FieldElement, ...], FieldElement]], x: FieldElement) -> FieldElement:
