@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 ![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
 [![Tests](https://github.com/davidosipov/PostQuantum-Feldman-VSS/actions/workflows/tests.yml/badge.svg)](https://github.com/davidosipov/PostQuantum-Feldman-VSS/actions/workflows/tests.yml)
+[![PyPI version](https://badge.fury.io/py/PostQuantum-Feldman-VSS.svg?icon=si%3Apython&icon_color=%23ffffff)](https://badge.fury.io/py/PostQuantum-Feldman-VSS)
 [![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
