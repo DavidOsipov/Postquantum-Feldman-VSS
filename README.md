@@ -8,7 +8,7 @@
 [![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
-[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-highlight.svg)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=DavidOsipov_PostQuantum-Feldman-VSS)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
 
 This library provides a Python implementation of Feldman's Verifiable Secret Sharing (VSS) scheme, designed with **post-quantum security** in mind. It builds upon Shamir's Secret Sharing, adding mathematical verification to ensure the integrity of distributed shares, and uses hash-based commitments to resist quantum attacks.
 
