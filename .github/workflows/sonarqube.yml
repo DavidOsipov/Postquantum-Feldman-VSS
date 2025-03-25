@@ -135,10 +135,9 @@ jobs:
           # Install the correct package
           poetry run pip install cyclonedx-bom
           
-          # Generate SBOM in JSON format from Poetry project with improved options
-          # --pyproject helps find project metadata including name
-          # Use correct format for specifying groups with proper quotes
-          poetry run cyclonedx-py poetry --with "dev" --pyproject pyproject.toml -o cyclonedx_report.json --of JSON .
+          # Generate SBOM in JSON format from Poetry project with correct parameter syntax
+          # Remove the trailing dot and fix the --with parameter syntax
+          poetry run cyclonedx-py poetry --with dev --pyproject pyproject.toml -o cyclonedx_report.json --of JSON --validate
           
           # Add error handling and debugging
           if [ -f "cyclonedx_report.json" ]; then
@@ -146,7 +145,7 @@ jobs:
           else
             echo "❌ Failed to generate cyclonedx_report.json"
             # Create a minimal valid file to prevent upload failure
-            echo '{"bomFormat":"CycloneDX","specVersion":"1.4","version":1,"metadata":{"component":{"name":"PostQuantum-Feldman-VSS","type":"application"}},"components":[]}' > cyclonedx_report.json
+            echo '{"bomFormat":"CycloneDX","specVersion":"1.5","version":1,"metadata":{"component":{"name":"PostQuantum-Feldman-VSS","type":"application"}},"components":[]}' > cyclonedx_report.json
           fi
 
       - name: Initialize CodeQL
