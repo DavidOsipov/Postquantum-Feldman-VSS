@@ -72,6 +72,7 @@ jobs:
           DEBUG: snyk*
         run: |
           pip install poetry
+          pip install poetry-plugin-export
           poetry export --format requirements.txt --output requirements.txt
           snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif
 
