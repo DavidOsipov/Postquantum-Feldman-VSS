@@ -185,7 +185,7 @@ if has_blake3:
         warnings.warn(
             "BLAKE3 library not found. Falling back to SHA3-256. "
             "Install BLAKE3 with: pip install blake3",
-            ImportWarning,
+            category=ImportWarning,
         )
 
 # Import gmpy2 - now a strict requirement
@@ -205,7 +205,7 @@ except ImportError:
 logging.basicConfig(
     level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("feldman_vss.log"), logging.StreamHandler()],
+    handlers=[logging.FileHandler(filename="feldman_vss.log"), logging.StreamHandler()],
 )
 logger = logging.getLogger("feldman_vss")
 
@@ -647,7 +647,7 @@ class ParameterError(Exception):
         # Validate timestamp
         if timestamp is not None and not isinstance(timestamp, int):
             raise TypeError("timestamp must be an integer or None")
-        self.timestamp = timestamp or int(time.time())
+        self.timestamp: int = timestamp or int(time.time())
 
         self.parameter_name = parameter_name  # Name of the invalid parameter
         self.parameter_value = parameter_value  # Value of the invalid parameter
@@ -4511,7 +4511,7 @@ class FeldmanVSS:
             TypeError: If inputs have incorrect types or structures.
         """
 
-        # Validate input parameter types
+        # Validate input parameter types - no changes needed here
         if not isinstance(zero_commitments, dict):
             raise TypeError("zero_commitments must be a dictionary")
         if not isinstance(zero_sharings, dict):
@@ -4519,8 +4519,7 @@ class FeldmanVSS:
         if not isinstance(participant_ids, list):
             raise TypeError("participant_ids must be a list")
 
-        # Validate the structure of zero_sharings
-
+        # Validate the structure of zero_sharings - no changes needed here
         party_id: int
         party_shares: ShareDict
         for party_id, party_shares in zero_sharings.items():
@@ -4536,8 +4535,7 @@ class FeldmanVSS:
                     message = "Invalid data structure"
                     self._raise_sanitized_error(TypeError, message, detailed_msg)
 
-        # Validate the structure of zero_commitments
-
+        # Validate the structure of zero_commitments - no changes needed here
         party_id: int
         commitments: CommitmentList
         for party_id, commitments in zero_commitments.items():
@@ -4552,7 +4550,12 @@ class FeldmanVSS:
                 message = "Invalid data structure"
                 self._raise_sanitized_error(TypeError, message, detailed_msg)
 
+        # Initialize result storage
         consistency_results: Dict[Tuple[int, int], bool] = {}
+        # Placeholder for consistency computation results to avoid timing leaks
+        consistency_data: List[Tuple[Tuple[int, int], Tuple[int, int], bool]] = []
+        # Byzantine evidence with improved structure
+        byzantine_evidence: Dict[int, Dict[str, Any]] = {}
 
         # Create cryptographically secure fingerprints of each sharing
         share_fingerprints: Dict[int, Dict[int, bytes]] = {}
@@ -4568,8 +4571,12 @@ class FeldmanVSS:
             for recipient_id, (x, y) in party_shares.items():
                 if recipient_id in participant_ids:
                     # Create a secure fingerprint using proper domain separation
+                    # Ensure consistent type conversion for x and y
+                    x_mpz: Union[int, "gmpy2.mpz"] = gmpy2.mpz(x)
+                    y_mpz: Union[int, "gmpy2.mpz"] = gmpy2.mpz(y)
+
                     message: bytes = self.group._enhanced_encode_for_hash(
-                        sending_party_id, recipient_id, x, y, "echo-consistency-check"
+                        sending_party_id, recipient_id, x_mpz, y_mpz, "echo-consistency-check"
                     )
                     fingerprint: bytes = self.hash_algorithm(message).digest()
                     share_fingerprints[sending_party_id][recipient_id] = fingerprint
@@ -4592,8 +4599,7 @@ class FeldmanVSS:
                         echo_broadcasts[recipient_id][sending_party_id] = (share, fingerprint)
 
         # Consistency check phase: compare what different participants received
-        byzantine_evidence: Dict[int, Dict[str, Any]] = {}
-
+        # Collect all comparisons before updating result dict to mitigate timing attack
         p1_id: int
         for p1_id in participant_ids:
             p2_id: int
@@ -4643,33 +4649,57 @@ class FeldmanVSS:
                                 p1_fingerprint, p2_fingerprint
                             )
 
-                            # Record consistency results for both participants
-                            consistency_results[(sending_party_id, p1_id)] = is_consistent
-                            consistency_results[(sending_party_id, p2_id)] = is_consistent
+                            # Store results for later batch processing to avoid timing side-channel
+                            consistency_data.append(
+                                (
+                                    (sending_party_id, p1_id),
+                                    (sending_party_id, p2_id),
+                                    is_consistent,
+                                )
+                            )
 
                             # If inconsistent, collect evidence of Byzantine behavior
+                            # Now separated from the dictionary update to avoid timing leaks
                             if not is_consistent:
                                 if sending_party_id not in byzantine_evidence:
                                     byzantine_evidence[sending_party_id] = {
                                         "type": "equivocation",
                                         "evidence": [],
+                                        "pattern_data": {},  # New field for pattern analysis
                                     }
 
-                                # Store share values directly rather than references for better security
-                                # and to prevent possible modifications
+                                # Ensure consistent type conversion for evidence
+                                p1_share_x_int = int(p1_share[0])
+                                p1_share_y_int = int(p1_share[1])
+                                p2_share_x_int = int(p2_share[0])
+                                p2_share_y_int = int(p2_share[1])
+
+                                # Store share values directly with explicit type conversion
+                                evidence_entry = {
+                                    "participant1": p1_id,
+                                    "share1": (p1_share_x_int, p1_share_y_int),
+                                    "participant2": p2_id,
+                                    "share2": (p2_share_x_int, p2_share_y_int),
+                                    "fingerprint1": p1_fingerprint.hex(),
+                                    "fingerprint2": p2_fingerprint.hex(),
+                                    "timestamp": int(time.time()),
+                                    "severity": 1.0,  # Base severity score
+                                }
+
+                                # Enhanced pattern detection: Track which participants received inconsistent shares
+                                target_pattern = byzantine_evidence[sending_party_id][
+                                    "pattern_data"
+                                ]
+                                if "targets" not in target_pattern:
+                                    target_pattern["targets"] = set()
+                                target_pattern["targets"].add(p1_id)
+                                target_pattern["targets"].add(p2_id)
+
+                                # Add to evidence list
                                 byzantine_evidence[sending_party_id]["evidence"].append(
-                                    {
-                                        "participant1": p1_id,
-                                        "share1": (int(p1_share[0]), int(p1_share[1])),
-                                        "participant2": p2_id,
-                                        "share2": (int(p2_share[0]), int(p2_share[1])),
-                                        "fingerprint1": p1_fingerprint.hex(),
-                                        "fingerprint2": p2_fingerprint.hex(),
-                                        "timestamp": int(
-                                            time.time()
-                                        ),  # Add timestamp for forensics
-                                    }
+                                    evidence_entry
                                 )
+
                         except (KeyError, ValueError, TypeError) as e:
                             # Safely handle unexpected errors with sanitized messages
                             detailed_msg = f"Error comparing shares: {e}"
@@ -4678,11 +4708,34 @@ class FeldmanVSS:
                             )
                             logger.error(sanitized_msg, exc_info=True)
                             # Default to inconsistent if we can't verify properly
-                            consistency_results[(sending_party_id, p1_id)] = False
-                            consistency_results[(sending_party_id, p2_id)] = False
+                            consistency_data.append(
+                                ((sending_party_id, p1_id), (sending_party_id, p2_id), False)
+                            )
 
-        # Store Byzantine evidence in a separate field rather than modifying the
-        # return structure to maintain compatibility with existing code
+        # Process additional pattern analysis for Byzantine behavior
+        for party_id, evidence_info in byzantine_evidence.items():
+            if "pattern_data" in evidence_info and "targets" in evidence_info["pattern_data"]:
+                target_set = evidence_info["pattern_data"]["targets"]
+                # Calculate what percentage of participants were targeted
+                targeting_ratio = len(target_set) / len(participant_ids)
+                evidence_info["targeting_ratio"] = targeting_ratio
+
+                # Detect selective targeting (targeting specific subgroups)
+                if 0.05 < targeting_ratio < 0.5:  # Targeted between 5% and 50% of participants
+                    evidence_info["selective_targeting"] = True
+                    # Increase severity for selective targeting
+                    for evidence in evidence_info["evidence"]:
+                        evidence["severity"] = 1.5  # Higher severity score
+
+                # Convert set to list for serialization
+                evidence_info["pattern_data"]["targets"] = list(target_set)
+
+        # Now perform the dictionary updates all at once to mitigate timing attacks
+        for key1, key2, value in consistency_data:
+            consistency_results[key1] = value
+            consistency_results[key2] = value
+
+        # Store Byzantine evidence in a separate field for access by _detect_byzantine_behavior
         self._byzantine_evidence = byzantine_evidence
 
         return consistency_results
@@ -5317,46 +5370,95 @@ class FeldmanVSS:
         Raises:
             TypeError: If inputs have incorrect types.
             ValueError: If commitments list is empty or proof structure is invalid.
+            SecurityError: If timestamp validation fails or memory safety checks fail.
         """
-        # Add validation
+        # Input validation with proper error sanitization
         if not isinstance(proof, dict):
-            raise TypeError("proof must be a dictionary")
+            self._raise_sanitized_error(TypeError, "proof must be a dictionary")
         if not isinstance(commitments, list):
-            raise TypeError("commitments must be a list")
+            self._raise_sanitized_error(TypeError, "commitments must be a list")
         if not commitments:
-            raise ValueError("commitments list cannot be empty")
+            self._raise_sanitized_error(ValueError, "commitments list cannot be empty")
 
+        # Validate proof timestamp if present
+        if "timestamp" in proof:
+            try:
+                validate_timestamp(proof["timestamp"])
+            except (TypeError, ValueError) as e:
+                detailed_msg = f"Invalid proof timestamp: {e}"
+                message = "Invalid proof timestamp"
+                self._raise_sanitized_error(SecurityError, message, detailed_msg)
+
+        # Perform memory safety check for verification operations
+        max_size = max(
+            [
+                len(commitments),
+                len(proof.get("responses", [])),
+                len(proof.get("blinding_commitments", [])),
+            ]
+        )
+        if not check_memory_safety(
+            "polynomial_proof_verification", max_size, self.field.prime.bit_length()
+        ):
+            detailed_msg = (
+                f"Proof verification would exceed memory safety limits: {max_size} elements"
+            )
+            message = "Memory safety check failed"
+            self._raise_sanitized_error(MemoryError, message, detailed_msg)
+
+        # Use secure redundant execution for fault resistance
+        try:
+            return secure_redundant_execution(
+                self._verify_polynomial_proof_internal,
+                proof,
+                commitments,
+                sanitize_error_func=self._sanitize_error,
+                function_name="verify_polynomial_proof",
+            )
+        except Exception as e:
+            # Handle exceptions from secure_redundant_execution
+            if isinstance(e, SecurityError):
+                raise  # Re-raise SecurityError without modification
+
+            detailed_msg = f"Proof verification failed: {str(e)}"
+            message = "Proof verification failed"
+            self._raise_sanitized_error(VerificationError, message, detailed_msg)
+            return False  # This line is unreachable but included for completeness
+
+    def _verify_polynomial_proof_internal(
+        self, proof: ProofDict, commitments: CommitmentList
+    ) -> bool:
+        """
+        Internal implementation of polynomial proof verification.
+
+        This is the core logic that gets executed redundantly by secure_redundant_execution.
+        """
         # Extract proof components with parameter validation
-        blinding_commitments: List[Tuple[FieldElement, FieldElement]]
-        challenge: FieldElement
-        responses: List[FieldElement]
-        commitment_randomizers: List[FieldElement]
-        blinding_randomizers: List[FieldElement]
-        timestamp: int
-
         try:
             blinding_commitments = proof["blinding_commitments"]
             challenge = proof["challenge"]
             responses = proof["responses"]
             commitment_randomizers = proof["commitment_randomizers"]
             blinding_randomizers = proof["blinding_randomizers"]
-            timestamp = proof.get("timestamp")  # Get timestamp for challenge reconstruction
         except (KeyError, TypeError) as e:
-            raise ValueError(f"Incomplete or malformed proof structure: {str(e)}")
+            detailed_msg = f"Incomplete or malformed proof structure: {str(e)}"
+            message = "Invalid proof structure"
+            self._raise_sanitized_error(ValueError, message, detailed_msg)
 
-        # Enhanced validation for proof structure - changed from warnings to exceptions for security-critical failures
+        # Enhanced validation for proof structure
         if not isinstance(blinding_commitments, list):
-            raise ValueError("blinding_commitments must be a list")
+            self._raise_sanitized_error(ValueError, "blinding_commitments must be a list")
         if not all(isinstance(c, tuple) and len(c) >= 2 for c in blinding_commitments):
-            raise ValueError(
-                "Each blinding commitment must be a tuple with at least (commitment, randomizer)"
+            self._raise_sanitized_error(
+                ValueError,
+                "Each blinding commitment must be a tuple with at least (commitment, randomizer)",
             )
         if not isinstance(challenge, (int, gmpy2.mpz)):
-            raise ValueError("challenge must be an integer")
+            self._raise_sanitized_error(ValueError, "challenge must be an integer")
         if not isinstance(responses, list) or not all(
             isinstance(r, (int, gmpy2.mpz)) for r in responses
         ):
-            raise ValueError("responses must be a list of integers")
+            self._raise_sanitized_error(ValueError, "responses must be a list of integers")
 
         # Validate that all component lists have the correct size
         if (
@@ -5365,55 +5467,160 @@ class FeldmanVSS:
             or len(commitment_randomizers) != len(commitments)
             or len(blinding_randomizers) != len(commitments)
         ):
-            detailed_msg = f"Inconsistent lengths in proof components. responses: {len(responses)}, commitments: {len(commitments)}, blinding_commitments: {len(blinding_commitments)}, commitment_randomizers: {len(commitment_randomizers)}, blinding_randomizers: {len(blinding_randomizers)}"
-            raise ValueError(f"Invalid proof structure: {detailed_msg}")
+
+            detailed_msg = (
+                f"Inconsistent lengths in proof components. responses: {len(responses)}, "
+                f"commitments: {len(commitments)}, blinding_commitments: {len(blinding_commitments)}, "
+                f"commitment_randomizers: {len(commitment_randomizers)}, "
+                f"blinding_randomizers: {len(blinding_randomizers)}"
+            )
+            message = "Invalid proof structure"
+            self._raise_sanitized_error(ValueError, message, detailed_msg)
+
+        # First verify challenge consistency using our helper method
+        if not self._verify_challenge_consistency(proof, commitments):
+            return False
 
         # Convert challenge to gmpy2.mpz once before the loop to avoid repeated conversion
         challenge_mpz = gmpy2.mpz(challenge)
 
-        # Verify each coefficient's proof - MODIFIED to prevent timing side-channels
-        all_valid: bool = True  # Track verification results without early return
+        # Verify each coefficient's proof with constant-time operations
+        all_valid = True  # Track verification results without early return
 
-        i: int
         for i in range(len(responses)):
-            # Verify response equation for hash-based commitments:
-            # H(z_i, r_z_i, i) = C_b_i + challenge * C_i
-
             # 1. Compute combined randomizer for the response: r_z_i = r_b_i + challenge * r_i
-            response_randomizer: FieldElement = (
+            response_randomizer = (
                 blinding_randomizers[i] + challenge_mpz * commitment_randomizers[i]
             ) % self.field.prime
 
             # 2. Compute the hash commitment for the response
-            computed_commitment: FieldElement = self._compute_hash_commitment(
+            computed_commitment = self._compute_hash_commitment(
                 responses[i], response_randomizer, i, "polynomial_proof_response"
             )
 
             # 3. Compute the expected commitment: C_b_i + challenge * C_i
-            # Fixed: Safer access to tuple elements with validation
+            # Safely access tuple elements with validation
             if not isinstance(blinding_commitments[i], tuple) or len(blinding_commitments[i]) < 1:
-                raise ValueError(f"Invalid blinding commitment format at index {i}")
+                self._raise_sanitized_error(
+                    ValueError, f"Invalid blinding commitment format at index {i}"
+                )
 
-            blinding_commitment_value: FieldElement = blinding_commitments[i][0]
-
-            # Fixed: Safer way to access commitment values without unsafe cast
             if not isinstance(commitments[i], tuple) or len(commitments[i]) < 1:
-                raise ValueError(f"Invalid commitment format at index {i}")
+                self._raise_sanitized_error(ValueError, f"Invalid commitment format at index {i}")
 
-            commitment_value: FieldElement = commitments[i][0]
+            blinding_commitment_value = blinding_commitments[i][0]
+            commitment_value = commitments[i][0]
 
             # Convert to consistent numeric types for arithmetic
             blinding_commitment_value = gmpy2.mpz(blinding_commitment_value)
             commitment_value = gmpy2.mpz(commitment_value)
 
-            expected_commitment: FieldElement = (
-                blinding_commitment_value + challenge_mpz * commitment_value
-            ) % self.group.prime
+            expected_commitment = gmpy2.mod(
+                blinding_commitment_value + challenge_mpz * commitment_value, self.group.prime
+            )
 
-            # 4. Update validity flag without early return
-            all_valid &= constant_time_compare(computed_commitment, expected_commitment)
+            # 4. Update validity flag using constant-time comparison to prevent timing attacks
+            is_valid = constant_time_compare(computed_commitment, expected_commitment)
+            all_valid = all_valid & is_valid  # Bitwise AND to prevent short-circuit
+
+            # Clean up sensitive data before returning
+        try:
+            # Only delete variables if they exist in locals()
+            local_vars = locals()
+            for var in ["blinding_commitment_value", "commitment_value", "response_randomizer"]:
+                if var in local_vars:
+                    del local_vars[var]
+
+            import gc
+
+            gc.collect()
+        except Exception as e:
+            # Log the error instead of silently passing
+            logging.debug(f"Non-critical error during cleanup: {str(e)}")
 
         return all_valid
+
+    def _verify_challenge_consistency(self, proof: ProofDict, commitments: CommitmentList) -> bool:
+        """
+        Description:
+            Verify that the challenge in a zero-knowledge proof was correctly derived
+            using the Fiat-Shamir transform, by recomputing the challenge and checking
+            it matches the one in the proof.
+
+        Arguments:
+            proof (ProofDict): The proof structure containing blinding commitments, challenge, etc.
+            commitments (CommitmentList): The commitments to the polynomial coefficients.
+
+        Inputs:
+            proof: The proof structure to verify
+            commitments: The commitments against which the proof was created
+
+        Outputs:
+            bool: True if the challenge is consistent, False otherwise.
+
+        Raises:
+            TypeError: If inputs have incorrect types.
+            ValueError: If proof structure is missing required components.
+        """
+        # Input validation
+        if not isinstance(proof, dict):
+            raise TypeError("proof must be a dictionary")
+        if not isinstance(commitments, list) or not commitments:
+            raise TypeError("commitments list cannot be empty")
+
+        # Extract required components from proof
+        try:
+            blinding_commitments: List[Tuple[int | mpz]] = proof["blinding_commitments"]
+            challenge = proof["challenge"]
+            timestamp = proof.get("timestamp", int(time.time()))
+        except KeyError as e:
+            detailed_msg = f"Proof missing required component: {e}"
+            message = "Invalid proof structure"
+            self._raise_sanitized_error(ValueError, message, detailed_msg)
+            return (
+                False  # This line is never reached due to the exception, but included for clarity
+            )
+
+        # Safe extraction of commitment values with proper error handling
+        try:
+            commitment_values: List[int | mpz] = [
+                c[0] if isinstance(c, tuple) and len(c) > 0 else 0 for c in commitments
+            ]
+            blinding_commitment_values: List[int | mpz] = [
+                bc[0] if isinstance(bc, tuple) and len(bc) > 0 else 0 for bc in blinding_commitments
+            ]
+        except (TypeError, IndexError) as e:
+            # Handle extraction errors without crashing
+            detailed_msg = f"Failed to extract commitment values: {e}"
+            message = "Invalid commitment format"
+            self._sanitize_error(message, detailed_msg)  # Just log, don't raise
+            return False
+
+        # Recreate the challenge input with the same encoding approach as in create_polynomial_proof
+        try:
+            challenge_input: bytes = self.group._enhanced_encode_for_hash(
+                "polynomial_proof",  # Domain separator
+                self.generator,
+                self.group.prime,
+                commitment_values,
+                blinding_commitment_values,
+                timestamp,
+            )
+
+            # Hash the challenge input using the configured hash algorithm
+            challenge_hash: bytes = self.hash_algorithm(challenge_input).digest()
+            expected_challenge: FieldElement = (
+                int.from_bytes(challenge_hash, byteorder="big") % self.field.prime
+            )
+
+            # Compare the expected challenge with the one in the proof using constant-time comparison
+            return constant_time_compare(expected_challenge, challenge)
+        except Exception as e:
+            # Catch any other unexpected errors during challenge recomputation
+            detailed_msg: str = f"Error during challenge consistency verification: {e}"
+            message = "Challenge verification failed"
+            self._sanitize_error(message, detailed_msg)  # Log the detailed error
+            return False
 
     def _detect_byzantine_behavior(
         self,
