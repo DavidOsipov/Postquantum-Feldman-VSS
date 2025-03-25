@@ -132,19 +132,27 @@ jobs:
       - name: Generate Software Bill of Materials (SBOM)
         if: matrix.tool == 'cyclonedx'
         run: |
-          # Install the correct package
+          # Install the specific package
           poetry run pip install cyclonedx-bom
           
-          # Generate SBOM in JSON format from Poetry project with correct parameter syntax
-          # Remove the trailing dot and fix the --with parameter syntax
-          poetry run cyclonedx-py poetry --with dev -o cyclonedx_report.json --of JSON --validate --all-extras
+          # Run with explicit parameters
+          poetry run cyclonedx-py poetry \
+            --with dev \
+            -o cyclonedx_report.json \
+            --of JSON \
+            --validate \
+            --all-extras \
+            --mc-type application \
+            .
           
-          # Add error handling and debugging
+          # Add error handling
           if [ -f "cyclonedx_report.json" ]; then
             echo "✅ Successfully generated cyclonedx_report.json"
+            # Show first few lines for debugging
+            head -n 20 cyclonedx_report.json
           else
             echo "❌ Failed to generate cyclonedx_report.json"
-            # Create a minimal valid file to prevent upload failure
+            # Create minimal valid file
             echo '{"bomFormat":"CycloneDX","specVersion":"1.5","version":1,"metadata":{"component":{"name":"PostQuantum-Feldman-VSS","type":"application"}},"components":[]}' > cyclonedx_report.json
           fi
 
