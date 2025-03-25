@@ -137,7 +137,7 @@ jobs:
           
           # Generate SBOM in JSON format from Poetry project with correct parameter syntax
           # Remove the trailing dot and fix the --with parameter syntax
-          poetry run cyclonedx-py poetry --with dev --pyproject pyproject.toml -o cyclonedx_report.json --of JSON --validate
+          poetry run cyclonedx-py poetry --with dev -o cyclonedx_report.json --of JSON --validate --all-extras
           
           # Add error handling and debugging
           if [ -f "cyclonedx_report.json" ]; then
