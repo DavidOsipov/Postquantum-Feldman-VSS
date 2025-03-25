@@ -133,10 +133,10 @@ jobs:
         if: matrix.tool == 'cyclonedx'
         run: |
           # Install the specific package
-          poetry run pip install cyclonedx-bom
+          pip install cyclonedx-bom
           
           # Run with explicit parameters
-          poetry run cyclonedx-py poetry \
+          cyclonedx-py poetry \
             --with dev \
             -o cyclonedx_report.json \
             --of JSON \
@@ -158,13 +158,13 @@ jobs:
 
       - name: Initialize CodeQL
         if: matrix.tool == 'codeql'
-        uses: github/codeql-action/init@main
+        uses: github/codeql-action/init@1a7989f3955e0c69f0e0ccc14aee54a387a0fd31
         with:
           languages: python
 
       - name: Perform CodeQL Analysis
         if: matrix.tool == 'codeql'
-        uses: github/codeql-action/analyze@main
+        uses: github/codeql-action/analyze@86b04fb0e47484f7282357688f21d5d0e32175fe
         with:
           output: codeql_report.sarif
 
