@@ -17,14 +17,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Wait for SonarQube analysis to complete
+      - name: Wait for 🛡️ Bastion Quality Gates to complete
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           PROJECT_KEY: DavidOsipov_PostQuantum-Feldman-VSS
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          echo "Waiting for SonarQube analysis to complete for commit: $GITHUB_SHA"
+          echo "Waiting for 🛡️ Bastion Quality Gates analysis to complete for commit: $GITHUB_SHA"
           
           MAX_ATTEMPTS=30  # 30 attempts × 30 seconds = 15 minutes maximum wait time
           ATTEMPT=1
@@ -62,32 +62,24 @@ jobs:
           echo "::error::Please ensure the SonarQube analysis is configured correctly."
           exit 1
 
-      - name: Check SonarQube Quality Gate
+      - name: Check 🛡️ Bastion Quality Gates
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           PROJECT_KEY: DavidOsipov_PostQuantum-Feldman-VSS
-          GITHUB_SHA: ${{ github.sha }}
         run: |
-          # Get analysis ID for this commit
-          ANALYSIS_RESPONSE=$(curl --silent --fail --show-error \
-            --header "Authorization: Bearer ${SONAR_TOKEN}" \
-            "${SONAR_HOST_URL}/api/ce/analysis_history?projectKey=${PROJECT_KEY}")
+          echo "Checking quality gate status for project: ${PROJECT_KEY}"
           
-          # Find analysis ID for the current commit SHA with status SUCCESS
-          ANALYSIS_ID=$(echo $ANALYSIS_RESPONSE | jq -r '.analyses[] | select(.scmRevision == "'${GITHUB_SHA}'" and .status == "SUCCESS") | .id')
-          
-          if [ -z "$ANALYSIS_ID" ]; then
-            echo "::error::No successful analysis found for commit ${GITHUB_SHA}"
-            exit 1
-          fi
-          
-          echo "Found analysis ID: $ANALYSIS_ID"
-          
-          # Get quality gate status using the analysis ID
+          # Get quality gate status using the projectKey parameter
           QUALITY_GATE_RESPONSE=$(curl --silent --fail --show-error \
             --header "Authorization: Bearer ${SONAR_TOKEN}" \
-            "${SONAR_HOST_URL}/api/qualitygates/project_status?analysisId=${ANALYSIS_ID}")
+            "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=${PROJECT_KEY}")
+          
+          # Check if request was successful
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to query SonarQube quality gate status"
+            exit 1
+          fi
           
           # Extract and check quality gate status
           STATUS=$(echo $QUALITY_GATE_RESPONSE | jq -r '.projectStatus.status')
