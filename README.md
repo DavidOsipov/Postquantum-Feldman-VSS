@@ -2,8 +2,8 @@
 
 [![PyPI version](https://badge.fury.io/py/PostQuantum-Feldman-VSS.svg?icon=si%3Apython&icon_color=%23ffffff)](https://badge.fury.io/py/PostQuantum-Feldman-VSS)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
-[![Tests](https://github.com/davidosipov/PostQuantum-Feldman-VSS/actions/workflows/tests.yml/badge.svg)](https://github.com/davidosipov/PostQuantum-Feldman-VSS/actions/workflows/tests.yml)
+![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)
+[![Tests](https://github.com/davidosipov/PostQuantum-Feldman-VSS/actions/workflows/python-tests.yml/badge.svg)](https://github.com/davidosipov/PostQuantum-Feldman-VSS/actions/workflows/python-tests.yml)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=coverage)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
@@ -133,10 +133,11 @@ print(f"Share {share_id} verification: {is_valid}")
 *   **Hash Algorithm:** BLAKE3 is the preferred hash algorithm for its speed and security. The library falls back to SHA3-256 if BLAKE3 is not available.
 *   **Entropy:** The library uses `secrets` for cryptographically secure random number generation.
 *   **Side-Channel Attacks:** Constant-time operations are used where appropriate to mitigate timing attacks. *However, see "Known Security Vulnerabilities" below.*
+*   **Advanced CI Security Features:** This project employs a comprehensive suite of security tools and processes integrated into its Continuous Integration (CI) pipeline, as detailed in the [Security Policy](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/security/policy). These features include static code analysis, dependency scanning, automated testing, report aggregation and verification, SonarQube integration, and quality gates, which prevent the release of substandard code.
 
 ## Known Security Vulnerabilities:
 
-This beta version (0.8.0b2) has several known security vulnerabilities that cannot be adequately addressed in pure Python:
+This beta version (0.8.1b1) has several known security vulnerabilities that cannot be adequately addressed in pure Python:
 
 1.  **Timing Side-Channels in Matrix Operations:** Functions like `_find_secure_pivot` and `_secure_matrix_solve` cannot guarantee constant-time execution in Python, potentially leaking secret information. (See [GHSA-q65w-fg65-79f4](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/security/advisories/GHSA-q65w-fg65-79f4))
 
@@ -150,7 +151,7 @@ This beta version (0.8.0b2) has several known security vulnerabilities that cann
 
 ## How the Script Works in Detail:
 
-For a comprehensive explanation of the internal workings of the `PostQuantum-Feldman-VSS` library (version 0.8.0b2), please refer to the detailed documentation on the [How version 0.8.0b2 works in detail](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki/How-version-0.8.0b2-works-in-detail) wiki page. This document provides an in-depth breakdown of each class and method, including design choices, security considerations, and potential vulnerabilities. It covers topics such as:
+For a comprehensive explanation of the internal workings of the `PostQuantum-Feldman-VSS` library (version 0.8.1b1), please refer to the detailed documentation on the [How version 0.8.1b1 works in detail](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki/How-version-0.8.1b1-works-in-detail) wiki page. This document provides an in-depth breakdown of each class and method, including design choices, security considerations, and potential vulnerabilities. It covers topics such as:
 
 *   **Class Structure:** Detailed explanation of `FeldmanVSS`, `CyclicGroup`, `VSSConfig`, and `SafeLRUCache`.
 *   **Core Methods:** Step-by-step walkthroughs of key methods like `create_commitments`, `verify_share`, `refresh_shares`, and more.
@@ -158,7 +159,7 @@ For a comprehensive explanation of the internal workings of the `PostQuantum-Fel
 *   **Helper Functions:** Explanation of supporting functions like `constant_time_compare`, `secure_redundant_execution`, and others.
 *   **Serialization and Deserialization:** Details on how commitment data is securely serialized and deserialized.
 *   **Zero-Knowledge Proofs:** How the library generates and verifies zero-knowledge proofs.
-*   **Integration with Pedersen VSS:** Dual verification for binding and hiding.
+* **Integration with Pedersen VSS:** Dual verification for binding and hiding.
 *   **Memory Monitoring**: Details on usage and integration of the new `MemoryMonitor` class.
 
 ## References:
