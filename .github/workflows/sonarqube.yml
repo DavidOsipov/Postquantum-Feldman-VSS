@@ -71,11 +71,9 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
           DEBUG: snyk*
         run: |
-          snyk test \
-            --command=poetry \
-            --file=pyproject.toml \
-            --strict-out-of-sync=false \
-            --sarif-file-output=snyk_report.sarif
+          pip install poetry
+          poetry export --format requirements.txt --output requirements.txt
+          snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif
 
       - name: Run Bandit
         if: matrix.tool == 'bandit'
