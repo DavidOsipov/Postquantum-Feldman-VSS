@@ -1,4 +1,7 @@
-# Code of Conduct
+## SonarQube metrics
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS) [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=bugs)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS) [![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
+
+## Code of Conduct
 
 This project and everyone participating in it is governed by the
 [PostQuantum Feldman VSS Code of Conduct](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/blob/main/CODE_OF_CONDUCT.md).
