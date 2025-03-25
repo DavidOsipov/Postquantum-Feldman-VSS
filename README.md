@@ -1,6 +1,13 @@
 # Post-Quantum Secure Feldman's Verifiable Secret Sharing
 
-[![Tests](https://github.com/davidosipov/PostQuantum-Feldman-VSS/actions/workflows/tests.yml/badge.svg)](https://github.com/davidosipov/PostQuantum-Feldman-VSS/actions/workflows/tests.yml) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=coverage)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS) [![Vulnerabilities](https://img.shields.io/badge/version-0.8.0b3-blue)](https://github.com/davidosipov/PostQuantum-Feldman-VSS) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE) ![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg) [![PyPI version](https://badge.fury.io/py/PostQuantum-Feldman-VSS.svg)](https://pypi.org/project/PostQuantum-Feldman-VSS/)
+[![PyPI version](https://badge.fury.io/py/PostQuantum-Feldman-VSS.svg?icon=si%3Apython&icon_color=%23ffffff)](https://badge.fury.io/py/PostQuantum-Feldman-VSS)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
+[![Tests](https://github.com/davidosipov/PostQuantum-Feldman-VSS/actions/workflows/tests.yml/badge.svg)](https://github.com/davidosipov/PostQuantum-Feldman-VSS/actions/workflows/tests.yml)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=coverage)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=DavidOsipov_PostQuantum-Feldman-VSS&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
 
 [![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=DavidOsipov_PostQuantum-Feldman-VSS)](https://sonarcloud.io/summary/new_code?id=DavidOsipov_PostQuantum-Feldman-VSS)
 
