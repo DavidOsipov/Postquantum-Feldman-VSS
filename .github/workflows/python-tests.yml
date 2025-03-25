@@ -41,7 +41,7 @@ jobs:
         path: |
           ~/.cache/pip
           ~/.cache/pypoetry
-        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock', 'pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-${{ matrix.python-version }}-
           

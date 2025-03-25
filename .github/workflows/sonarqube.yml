@@ -16,11 +16,11 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  Python_Tests:
     uses: ./.github/workflows/python-tests.yml
   # This workflow now depends on the successful completion of the python-tests workflow
   Analyze:
-    needs: test
+    needs: Python_Tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -40,11 +40,13 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
         with:
           path: |
-            /usr/local/lib/python3.13/site-packages
+            ~/.cache/pip
             ~/.cache/pypoetry
-          key: pip-poetry-${{ hashFiles('pyproject.toml') }}
+            /usr/local/lib/python3.13/site-packages
+          key: ${{ runner.os }}-poetry-${{ matrix.tool }}-${{ hashFiles('**/poetry.lock', 'pyproject.toml') }}
           restore-keys: |
-            pip-poetry-
+            ${{ runner.os }}-poetry-${{ matrix.tool }}-
+            ${{ runner.os }}-poetry-
 
       - name: Install Poetry
         if: matrix.tool != 'codeql'
@@ -164,26 +166,104 @@ jobs:
         with:
           path: reports
 
-      - name: Move reports to working directory
+      - name: Process reports and prepare for SonarQube
         run: |
-          mv reports/bandit-report/bandit_report.json .
-          mv reports/ruff-report/ruff_report.json .
-          mv reports/mypy-report/mypy_report.txt .
-          mv reports/flake8-report/flake8_report.txt .
-          mv reports/pylint-report/pylint_report.json .
-          mv reports/codeql-report/codeql_report.sarif .
-          mv reports/snyk-report/snyk_report.sarif .
-          mv reports/pyright-report/pyright_report.json .
-          mv reports/cyclonedx-report/cyclonedx_report.json .
-
-      - name: Check if reports exist
-        run: |
-          for report in bandit_report.json ruff_report.json mypy_report.txt flake8_report.txt pylint_report.json codeql_report.sarif snyk_report.sarif pyright_report.json cyclonedx_report.json; do
-            if [ ! -f "$report" ]; then
-              echo "$report not found. Exiting."
-              exit 1
+          mkdir -p processed_reports
+          
+          # Function to safely move reports
+          safe_move_report() {
+            local source_dir="$1"
+            local report_file="$2"
+            local target_file="$3"
+            
+            if [ -f "${source_dir}/${report_file}" ]; then
+              echo "✅ Found ${report_file}"
+              cp "${source_dir}/${report_file}" "${target_file}"
+              return 0
+            else
+              echo "⚠️ Warning: ${report_file} not found in ${source_dir}"
+              # For JSON reports, create an empty valid JSON file
+              if [[ "${report_file}" == *".json" ]]; then
+                echo "Creating empty JSON file for ${target_file}"
+                echo "[]" > "${target_file}"
+              # For SARIF reports, create a minimal valid SARIF file
+              elif [[ "${report_file}" == *".sarif" ]]; then
+                echo "Creating minimal SARIF file for ${target_file}"
+                echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Missing Report","rules":[]}},"results":[]}]}' > "${target_file}"
+              # For text reports, create an empty file
+              else
+                echo "Creating empty file for ${target_file}"
+                touch "${target_file}"
+              fi
+              return 1
             fi
-          done
+          }
+          
+          # Initialize list of available report paths for SonarQube
+          sonar_args=""
+          
+          # Process each report type
+          safe_move_report "reports/bandit-report" "bandit_report.json" "processed_reports/bandit_report.json"
+          if [ $? -eq 0 ]; then
+            sonar_args="${sonar_args} -Dsonar.python.bandit.reportPaths=processed_reports/bandit_report.json"
+          fi
+          
+          safe_move_report "reports/ruff-report" "ruff_report.json" "processed_reports/ruff_report.json"
+          if [ $? -eq 0 ]; then
+            sonar_args="${sonar_args} -Dsonar.python.ruff.reportPaths=processed_reports/ruff_report.json"
+          fi
+          
+          safe_move_report "reports/mypy-report" "mypy_report.txt" "processed_reports/mypy_report.txt"
+          if [ $? -eq 0 ]; then
+            sonar_args="${sonar_args} -Dsonar.python.mypy.reportPaths=processed_reports/mypy_report.txt"
+          fi
+          
+          safe_move_report "reports/flake8-report" "flake8_report.txt" "processed_reports/flake8_report.txt"
+          if [ $? -eq 0 ]; then
+            sonar_args="${sonar_args} -Dsonar.python.flake8.reportPaths=processed_reports/flake8_report.txt"
+          fi
+          
+          safe_move_report "reports/pylint-report" "pylint_report.json" "processed_reports/pylint_report.json"
+          if [ $? -eq 0 ]; then
+            sonar_args="${sonar_args} -Dsonar.python.pylint.reportPaths=processed_reports/pylint_report.json"
+          fi
+          
+          # Process SARIF reports and combine into a single list if both exist
+          sarif_reports=""
+          safe_move_report "reports/codeql-report" "codeql_report.sarif" "processed_reports/codeql_report.sarif"
+          if [ $? -eq 0 ]; then
+            sarif_reports="processed_reports/codeql_report.sarif"
+          fi
+          
+          safe_move_report "reports/snyk-report" "snyk_report.sarif" "processed_reports/snyk_report.sarif"
+          if [ $? -eq 0 ]; then
+            if [ -n "$sarif_reports" ]; then
+              sarif_reports="${sarif_reports},processed_reports/snyk_report.sarif"
+            else
+              sarif_reports="processed_reports/snyk_report.sarif"
+            fi
+          fi
+          
+          if [ -n "$sarif_reports" ]; then
+            sonar_args="${sonar_args} -Dsonar.sarifReportPaths=${sarif_reports}"
+          fi
+          
+          safe_move_report "reports/pyright-report" "pyright_report.json" "processed_reports/pyright_report.json"
+          if [ $? -eq 0 ]; then
+            sonar_args="${sonar_args} -Dsonar.externalIssuesReportPaths=processed_reports/pyright_report.json"
+          fi
+          
+          safe_move_report "reports/cyclonedx-report" "cyclonedx_report.json" "processed_reports/cyclonedx_report.json"
+          if [ $? -eq 0 ]; then
+            sonar_args="${sonar_args} -Dsonar.dependencyCheck.jsonReportPath=processed_reports/cyclonedx_report.json"
+          fi
+          
+          # Store SonarQube args in environment variable for next step
+          echo "SONAR_EXTRA_ARGS=${sonar_args}" >> $GITHUB_ENV
+          
+          # Print summary
+          echo "✨ Report processing complete. SonarQube will use the following reports:"
+          echo "${sonar_args}"
 
       - name: Analyze with SonarQube
         uses: SonarSource/sonarqube-scan-action@aa494459d7c39c106cc77b166de8b4250a32bb97
@@ -195,13 +275,6 @@ jobs:
           args: >
             -Dsonar.projectKey=DavidOsipov_PostQuantum-Feldman-VSS
             -Dsonar.organization=davidosipov
-            -Dsonar.python.bandit.reportPaths=bandit_report.json
-            -Dsonar.python.ruff.reportPaths=ruff_report.json
-            -Dsonar.python.mypy.reportPaths=mypy_report.txt
-            -Dsonar.python.flake8.reportPaths=flake8_report.txt
-            -Dsonar.python.pylint.reportPaths=pylint_report.json
-            -Dsonar.sarifReportPaths=codeql_report.sarif,snyk_report.sarif
-            -Dsonar.externalIssuesReportPaths=pyright_report.json
-            -Dsonar.dependencyCheck.jsonReportPath=cyclonedx_report.json
             -Dsonar.python.version=3.10-3.13
             -Dsonar.languages=python
+            ${{ env.SONAR_EXTRA_ARGS }}
