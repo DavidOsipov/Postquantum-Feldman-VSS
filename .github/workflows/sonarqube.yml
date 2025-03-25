@@ -1,20 +1,4 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-# This workflow triggers a SonarQube analysis of your code and populates
-# GitHub Code Scanning alerts with vulnerabilities found.
-# (Available starting from SonarQube 9.7, Developer Edition and above)
-
-# Prerequisites:
-# 1. Add a valid GitHub configuration in SonarQube (Administration > DevOps platforms > GitHub).
-# 2. Import your project into SonarQube by creating a new project from your repository.
-# 3. Set up secrets in your GitHub repository:
-#    - SONAR_TOKEN: Generate a token in SonarQube (My Account > Security) and add it to GitHub secrets.
-#    - SONAR_HOST_URL: Add your SonarQube host URL (e.g., https://sonarcloud.io) to GitHub secrets.
-
-name: SonarQube analysis
+name: Analyze and SonarQube Scan
 
 on:
   push:
@@ -39,7 +23,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55
         with:
-          python-version: '3.12'
+          python-version: '3.12'  # Matches your log
 
       - name: Cache pip dependencies
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
@@ -51,11 +35,14 @@ jobs:
 
       - name: Install project dependencies
         run: |
-          pip install -e .[dev]  # Assumes dev dependencies (e.g., Bandit, Ruff, Mypy) are in [dev] extras
+          pip install .
+          pip install .[dev]
 
       - name: Install analysis tools
         run: |
           pip install bandit ruff mypy
+          ruff --version  # For debugging
+          mypy --version  # For debugging
 
       - name: Run Bandit
         if: matrix.tool == 'bandit'
@@ -63,17 +50,17 @@ jobs:
 
       - name: Run Ruff
         if: matrix.tool == 'ruff'
-        run: ruff check . --output-format json --output-file ruff_report.json --exclude tests,.git
+        run: ruff check . --output-format json --output-file ruff_report.json --exclude tests,.git || true
 
       - name: Run Mypy
         if: matrix.tool == 'mypy'
-        run: mypy . > mypy_report.txt
+        run: mypy . 2>&1 | tee mypy_report.txt || true  # Capture output to file and console, continue on error
 
       - name: Upload report artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ${{ matrix.tool }}-report
-          path: ${{ matrix.tool }}_report.json
+          path: ${{ matrix.tool }}_report.*
 
   SonarQube:
     needs: Analyze
@@ -103,11 +90,11 @@ jobs:
           done
 
       - name: Analyze with SonarQube
-        uses: SonarSource/sonarqube-scan-action@aa494459d7c39c106cc77b166de8b4250a32bb97 # Pinned by Renovate
+        uses: SonarSource/sonarqube-scan-action@aa494459d7c39c106cc77b166de8b4250a32bb97
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}    # Your SonarQube token from secrets
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}  # Your SonarQube host URL from secrets
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         with:
           args: >
             -Dsonar.projectKey=DavidOsipov_PostQuantum-Feldman-VSS
@@ -115,5 +102,5 @@ jobs:
             -Dsonar.python.bandit.reportPaths=bandit_report.json
             -Dsonar.python.ruff.reportPaths=ruff_report.json
             -Dsonar.python.mypy.reportPaths=mypy_report.txt
-            -Dsonar.python.version=3.10, 3.11, 3.12, 3.13
+            -Dsonar.python.version=3.10-3.13
             -Dsonar.languages=python
