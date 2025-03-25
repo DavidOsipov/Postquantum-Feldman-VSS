@@ -181,7 +181,17 @@ jobs:
           
           # Define report file patterns based on the tool
           if '${{ matrix.tool }}' == 'codeql':
-              report_files = ['codeql_report.sarif']
+              # CodeQL outputs to a directory with python.sarif inside
+              if os.path.isdir('codeql_report.sarif') and os.path.exists('codeql_report.sarif/python.sarif'):
+                  report_files = ['codeql_report.sarif/python.sarif']
+              else:
+                  # Fallback if structure is different
+                  sarif_files = glob.glob('codeql_report.sarif/**/*.sarif', recursive=True)
+                  if sarif_files:
+                      report_files = sarif_files
+                  else:
+                      print('Warning: No SARIF files found in codeql_report.sarif directory')
+                      report_files = []
           elif '${{ matrix.tool }}' == 'snyk':
               report_files = ['snyk_report.sarif']
           else:
@@ -209,7 +219,8 @@ jobs:
           name: ${{ matrix.tool }}-report
           path: |
             ${{ matrix.tool }}_report.*
-            codeql_report.sarif*
+            codeql_report.sarif/**/*.sarif*
+            codeql_report.sarif/**/*.sarif.sha3
             snyk_report.sarif*
 
   SonarQube:
@@ -277,9 +288,9 @@ jobs:
                 return 4
               fi
               
-            # Then try nested structure for CodeQL
-            elif [ -f "${source_dir}/${report_file}/python.sarif" ]; then
-              echo "✅ Found ${report_file}/python.sarif"
+            # Handle CodeQL special case - check for python.sarif inside the directory
+            elif [[ "${report_file}" == "codeql_report.sarif" ]] && [ -d "${source_dir}/${report_file}" ] && [ -f "${source_dir}/${report_file}/python.sarif" ]; then
+              echo "✅ Found ${report_file}/python.sarif (CodeQL directory structure)"
               
               # Verify hash before copying
               if verify_hash "${source_dir}/${report_file}/python.sarif" || [ $? -eq 2 ]; then
