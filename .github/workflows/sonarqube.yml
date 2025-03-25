@@ -19,8 +19,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55
@@ -70,6 +68,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+        with:
+          fetch-depth: 0  # Fetch full Git history for SonarQube
 
       - name: Download analysis reports
         uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e
