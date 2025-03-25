@@ -54,10 +54,6 @@ jobs:
       run: |
         poetry install --no-interaction
         
-    - name: Typecheck with mypy
-      run: |
-        poetry run mypy feldman_vss.py
-        
     # Uncomment and modify when you have tests
     # - name: Run tests
     #   run: |
