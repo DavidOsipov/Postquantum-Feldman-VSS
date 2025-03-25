@@ -13,6 +13,7 @@ on:
 permissions:
   pull-requests: read
   security-events: write
+  contents: read
 
 jobs:
   test:
