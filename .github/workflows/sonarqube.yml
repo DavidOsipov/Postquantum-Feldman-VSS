@@ -134,8 +134,11 @@ jobs:
         run: |
           # Install the correct package
           poetry run pip install cyclonedx-bom
+          
           # Generate SBOM in JSON format from Poetry project
-          poetry run cyclonedx-py poetry -o cyclonedx_report.json --output-format JSON .
+          # Fixed command with proper syntax and including dev dependencies
+          poetry run cyclonedx-py poetry --with dev -o cyclonedx_report.json --of JSON .
+          
           # Add error handling and debugging
           if [ -f "cyclonedx_report.json" ]; then
             echo "✅ Successfully generated cyclonedx_report.json"
