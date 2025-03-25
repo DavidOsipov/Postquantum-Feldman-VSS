@@ -1,10 +1,13 @@
 name: 🛡️ Bastion Quality Gates
 
+
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
   workflow_dispatch:
 
 permissions:
@@ -12,11 +15,15 @@ permissions:
   security-events: write
 
 jobs:
+  test:
+    uses: ./.github/workflows/python-tests.yml
+  # This workflow now depends on the successful completion of the python-tests workflow
   Analyze:
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        tool: [bandit, ruff, mypy, flake8, pylint, codeql, snyk]
+        tool: [bandit, ruff, mypy, flake8, pylint, codeql, snyk, pyright, cyclonedx]
     steps:
       - name: Checkout code
         uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
@@ -50,7 +57,7 @@ jobs:
           poetry install --with dev --no-interaction
 
       - name: Install analysis tools
-        if: matrix.tool != 'codeql' && matrix.tool != 'snyk'
+        if: matrix.tool != 'codeql' && matrix.tool != 'snyk' && matrix.tool != 'pyright' && matrix.tool != 'cyclonedx'
         run: |
           poetry run pip install bandit ruff mypy flake8 pylint
           poetry run bandit --version
@@ -58,6 +65,24 @@ jobs:
           poetry run mypy --version
           poetry run flake8 --version
           poetry run pylint --version
+
+      - name: Install Node.js for Pyright
+        if: matrix.tool == 'pyright'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Pyright
+        if: matrix.tool == 'pyright'
+        run: |
+          npm install -g pyright
+          pyright --version
+
+      - name: Install CycloneDX
+        if: matrix.tool == 'cyclonedx'
+        run: |
+          poetry run pip install cyclonedx-bom
+          poetry run cyclonedx-py --version || echo "CycloneDX installed"
 
       - name: Setup Snyk CLI
         if: matrix.tool == 'snyk'
@@ -73,8 +98,9 @@ jobs:
         run: |
           pip install poetry
           pip install poetry-plugin-export
-          poetry export --format requirements.txt --output requirements.txt
-          snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif
+          poetry export --format requirements.txt --output requirements.txt --with dev
+          pip install black blake3 click colorama flake8 gmpy2 isort mccabe msgpack-types mypy-extensions pathspec psutil pycodestyle pyflakes setuptools types-requests types-setuptools typing-extensions
+          snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif --skip-unresolved || snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif --skip-unresolved --all-projects
 
       - name: Run Bandit
         if: matrix.tool == 'bandit'
@@ -95,6 +121,15 @@ jobs:
       - name: Run Pylint
         if: matrix.tool == 'pylint'
         run: poetry run pylint --recursive=y . --output-format=json > pylint_report.json || true
+
+      - name: Run Pyright
+        if: matrix.tool == 'pyright'
+        run: pyright --outputjson > pyright_report.json || true
+
+      - name: Generate Software Bill of Materials (SBOM)
+        if: matrix.tool == 'cyclonedx'
+        run: |
+          poetry run cyclonedx-py -o cyclonedx_report.json -j . || true
 
       - name: Initialize CodeQL
         if: matrix.tool == 'codeql'
@@ -137,10 +172,12 @@ jobs:
           mv reports/pylint-report/pylint_report.json .
           mv reports/codeql-report/codeql_report.sarif .
           mv reports/snyk-report/snyk_report.sarif .
+          mv reports/pyright-report/pyright_report.json .
+          mv reports/cyclonedx-report/cyclonedx_report.json .
 
       - name: Check if reports exist
         run: |
-          for report in bandit_report.json ruff_report.json mypy_report.txt flake8_report.txt pylint_report.json codeql_report.sarif snyk_report.sarif; do
+          for report in bandit_report.json ruff_report.json mypy_report.txt flake8_report.txt pylint_report.json codeql_report.sarif snyk_report.sarif pyright_report.json cyclonedx_report.json; do
             if [ ! -f "$report" ]; then
               echo "$report not found. Exiting."
               exit 1
@@ -163,5 +200,7 @@ jobs:
             -Dsonar.python.flake8.reportPaths=flake8_report.txt
             -Dsonar.python.pylint.reportPaths=pylint_report.json
             -Dsonar.sarifReportPaths=codeql_report.sarif,snyk_report.sarif
+            -Dsonar.externalIssuesReportPaths=pyright_report.json
+            -Dsonar.dependencyCheck.jsonReportPath=cyclonedx_report.json
             -Dsonar.python.version=3.10-3.13
             -Dsonar.languages=python

@@ -1,0 +1,64 @@
+name: 🧪 Python Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+  workflow_call:
+    # Adding empty outputs to properly define the workflow_call trigger
+    outputs:
+      result:
+        description: "Test execution result"
+        value: ${{ jobs.test.result }}
+    
+# Adding explicit permissions following the principle of least privilege
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.cache/pypoetry
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          
+    - name: Install Poetry
+      run: |
+        pip install poetry
+        poetry --version
+        
+    - name: Install dependencies
+      run: |
+        poetry install --no-interaction
+        
+    - name: Typecheck with mypy
+      run: |
+        poetry run mypy feldman_vss.py
+        
+    # Uncomment and modify when you have tests
+    # - name: Run tests
+    #   run: |
+    #     poetry run pytest
