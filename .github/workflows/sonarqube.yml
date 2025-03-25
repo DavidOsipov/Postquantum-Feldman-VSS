@@ -70,7 +70,7 @@ jobs:
         uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
 
       - name: Download analysis reports
-        uses: actions/download-artifact@e9b2e897dilf532e1d0f7ea2dbee0f23fb39bb8
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e
         with:
           path: reports
 
