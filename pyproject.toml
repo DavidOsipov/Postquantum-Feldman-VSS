@@ -65,7 +65,8 @@ documentation = "https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/wiki"
 "Signal" =  "https://signal.me/#eu/d68l1UjrWlGVRzbfkVM1bvQMNqCqiae9GM86P_af8ZK2o5E5YSNKbL4MyM9y-2WH"
 
 [tool.setuptools]
-py-modules = ["feldman_vss.py"]
+py-modules = ["feldman_vss"]
+package-dir = { "" = "." }
 
 [tool.poetry]
 packages = [
