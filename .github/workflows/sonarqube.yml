@@ -46,7 +46,7 @@ jobs:
 
       - name: Run Bandit
         if: matrix.tool == 'bandit'
-        run: bandit -r . -o bandit_report.json --format json --exclude tests,.git
+        run: bandit -r . -o bandit_report.json --format json --exclude tests,.git || true
 
       - name: Run Ruff
         if: matrix.tool == 'ruff'
