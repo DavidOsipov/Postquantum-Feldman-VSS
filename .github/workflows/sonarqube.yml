@@ -190,12 +190,19 @@ jobs:
             local report_file="$2"
             local target_file="$3"
             
+            # First try direct path
             if [ -f "${source_dir}/${report_file}" ]; then
               echo "✅ Found ${report_file}"
               cp "${source_dir}/${report_file}" "${target_file}"
               return 0
+            # Then try nested structure for CodeQL
+            elif [ -f "${source_dir}/${report_file}/python.sarif" ]; then
+              echo "✅ Found ${report_file}/python.sarif"
+              cp "${source_dir}/${report_file}/python.sarif" "${target_file}"
+              return 0
             else
               echo "⚠️ Warning: ${report_file} not found in ${source_dir}"
+              # Create fallback file...
               # For JSON reports, create an empty valid JSON file
               if [[ "${report_file}" == *".json" ]]; then
                 echo "Creating empty JSON file for ${target_file}"
