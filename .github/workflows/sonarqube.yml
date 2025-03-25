@@ -173,13 +173,44 @@ jobs:
         with:
           output: codeql_report.sarif
 
+      # Generate SHA3-256 hashes for all report files
+      - name: Generate SHA3-256 hash for report files
+        run: |
+          python -c "
+          import hashlib, sys, os, glob
+          
+          # Define report file patterns based on the tool
+          if '${{ matrix.tool }}' == 'codeql':
+              report_files = ['codeql_report.sarif']
+          elif '${{ matrix.tool }}' == 'snyk':
+              report_files = ['snyk_report.sarif']
+          else:
+              # Handle standard tool reports
+              extensions = {'bandit': 'json', 'ruff': 'json', 'pylint': 'json', 'mypy': 'txt', 'flake8': 'txt'}
+              extension = extensions.get('${{ matrix.tool }}', 'txt')
+              report_files = ['${{ matrix.tool }}_report.' + extension]
+          
+          # Generate hash for each report file
+          for report_file in report_files:
+              if os.path.exists(report_file):
+                  with open(report_file, 'rb') as f:
+                      content = f.read()
+                      hash_obj = hashlib.sha3_256(content)
+                      with open(report_file + '.sha3', 'w') as hf:
+                          hf.write(hash_obj.hexdigest())
+                          print(f'Generated hash for {report_file}')
+              else:
+                  print(f'Warning: Report file {report_file} not found')
+          "
+
       - name: Upload report artifact
         uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47
         with:
           name: ${{ matrix.tool }}-report
           path: |
             ${{ matrix.tool }}_report.*
-            codeql_report.sarif
+            codeql_report.sarif*
+            snyk_report.sarif*
 
   SonarQube:
     needs: Analyze
@@ -199,7 +230,35 @@ jobs:
         run: |
           mkdir -p processed_reports
             
-          # Function to safely move reports
+          # Function to verify SHA3-256 hash
+          verify_hash() {
+            local file_path="$1"
+            local hash_path="${file_path}.sha3"
+            
+            if [ -f "$file_path" ] && [ -f "$hash_path" ]; then
+              echo "Verifying hash for $file_path"
+              expected_hash=$(cat "$hash_path")
+              computed_hash=$(python -c "import hashlib; data = open('$file_path', 'rb').read(); print(hashlib.sha3_256(data).hexdigest())")
+              
+              if [ "$expected_hash" = "$computed_hash" ]; then
+                echo "✅ Hash verification successful for $file_path"
+                return 0
+              else
+                echo "❌ Hash verification FAILED for $file_path"
+                echo "Expected: $expected_hash"
+                echo "Computed: $computed_hash"
+                return 1
+              fi
+            elif [ -f "$file_path" ]; then
+              echo "⚠️ Warning: No hash file found for $file_path"
+              return 2
+            else
+              echo "⚠️ Warning: File not found: $file_path"
+              return 3
+            fi
+          }
+            
+          # Function to safely move reports with hash verification
           safe_move_report() {
             local source_dir="$1"
             local report_file="$2"
@@ -208,13 +267,29 @@ jobs:
             # First try direct path
             if [ -f "${source_dir}/${report_file}" ]; then
               echo "✅ Found ${report_file}"
-              cp "${source_dir}/${report_file}" "${target_file}"
-              return 0
+              
+              # Verify hash before copying
+              if verify_hash "${source_dir}/${report_file}" || [ $? -eq 2 ]; then
+                cp "${source_dir}/${report_file}" "${target_file}"
+                return 0
+              else
+                echo "⚠️ Hash verification failed for ${report_file}, skipping"
+                return 4
+              fi
+              
             # Then try nested structure for CodeQL
             elif [ -f "${source_dir}/${report_file}/python.sarif" ]; then
               echo "✅ Found ${report_file}/python.sarif"
-              cp "${source_dir}/${report_file}/python.sarif" "${target_file}"
-              return 0
+              
+              # Verify hash before copying
+              if verify_hash "${source_dir}/${report_file}/python.sarif" || [ $? -eq 2 ]; then
+                cp "${source_dir}/${report_file}/python.sarif" "${target_file}"
+                return 0
+              else
+                echo "⚠️ Hash verification failed for ${report_file}/python.sarif, skipping"
+                return 4
+              fi
+              
             else
               echo "⚠️ Warning: ${report_file} not found in ${source_dir}"
               # Create fallback file...
@@ -303,4 +378,6 @@ jobs:
             -Dsonar.organization=davidosipov
             -Dsonar.python.version=3.10,3.11,3.12,3.13
             -Dsonar.languages=python
+            -Dsonar.python.analyzeGeneratedCode=true
+            -Dsonar.verbose=true
             ${{ env.SONAR_EXTRA_ARGS }}
