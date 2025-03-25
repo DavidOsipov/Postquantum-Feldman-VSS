@@ -85,9 +85,8 @@ psutil = { version = "==7.0.0", optional = true }
 
 
 [tool.poetry.group.dev.dependencies]
-black = ">=24.0"
-isort = ">=5.10"
-flake8 = ">=7.0"
+ruff = ">=0.11.0"
+bandit = ">=1.8.1"
 types-requests = "*"
 types-setuptools = "*"
 msgpack-types = "==0.5.0"
@@ -115,16 +114,6 @@ exclude_lines = [
 profile = "black"
 line_length = 120
 known_first_party = ["feldman_vss"]
-
-[tool.black]
-line-length = 120
-target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
-
-
-[tool.flake8]
-max-line-length = 120
-extend-ignore = ["E203", "W503", "E501"]
-per-file-ignores = ["__init__.py:F401"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "examples", ".venv"]
