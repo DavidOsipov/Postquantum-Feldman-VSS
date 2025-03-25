@@ -39,7 +39,7 @@ jobs:
             
             # Check if request was successful
             if [ $? -ne 0 ]; then
-              echo "Failed to query SonarQube API for project status"
+              echo "❌ Failed to query SonarQube API for project status"
               sleep 30
               ATTEMPT=$((ATTEMPT+1))
               continue
@@ -49,22 +49,22 @@ jobs:
             STATUS=$(echo $ANALYSIS_RESPONSE | jq -r '.projectStatus.status')
             
             if [ "$STATUS" == "OK" ] || [ "$STATUS" == "ERROR" ] || [ "$STATUS" == "WARN" ]; then
-              echo "✅ Analysis complete with status: $STATUS"
               if [ "$STATUS" == "OK" ]; then
+                echo "✅ Analysis complete with status: $STATUS"
                 exit 0
               else
-                echo "::warning::Analysis completed but with status: $STATUS"
+                echo "⚠️ Analysis completed but with status: $STATUS"
                 exit 0  # Still allow the workflow to continue
               fi
             fi
             
-            echo "Analysis not yet complete. Waiting 30 seconds before next check..."
+            echo "⏳ Analysis not yet complete. Waiting 30 seconds before next check..."
             sleep 30
             ATTEMPT=$((ATTEMPT+1))
           done
           
-          echo "::error::Timed out waiting for SonarQube analysis to complete after $(($MAX_ATTEMPTS * 30)) seconds"
-          echo "::error::Please ensure the SonarQube analysis is configured correctly."
+          echo "⏰ ::error::Timed out waiting for SonarQube analysis to complete after $(($MAX_ATTEMPTS * 30)) seconds"
+          echo "🔍 ::error::Please ensure the SonarQube analysis is configured correctly."
           exit 1
 
       - name: Check 🛡️ Bastion Quality Gates
@@ -73,7 +73,7 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           PROJECT_KEY: DavidOsipov_PostQuantum-Feldman-VSS
         run: |
-          echo "Checking quality gate status for project: ${PROJECT_KEY}"
+          echo "🔍 Checking quality gate status for project: ${PROJECT_KEY}"
           
           # Get quality gate status using the projectKey parameter
           QUALITY_GATE_RESPONSE=$(curl --silent --fail --show-error \
@@ -82,19 +82,19 @@ jobs:
           
           # Check if request was successful
           if [ $? -ne 0 ]; then
-            echo "::error::Failed to query SonarQube quality gate status"
+            echo "❌ ::error::Failed to query SonarQube quality gate status"
             exit 1
           fi
           
           # Extract and check quality gate status
           STATUS=$(echo $QUALITY_GATE_RESPONSE | jq -r '.projectStatus.status')
-          echo "Quality Gate Status: $STATUS"
+          echo "🚦 Quality Gate Status: $STATUS"
           
           # Print detailed condition information when status is not OK
           if [ "$STATUS" != "OK" ]; then
-            echo "::group::Quality Gate Failure Details"
-            echo "Failed conditions:"
-            echo $QUALITY_GATE_RESPONSE | jq -r '.projectStatus.conditions[] | select(.status != "OK") | "- Metric: \(.metricKey), Status: \(.status), Error threshold: \(.errorThreshold), Actual value: \(.actualValue)"'
+            echo "::group::❌ Quality Gate Failure Details"
+            echo "🚫 Failed conditions:"
+            echo $QUALITY_GATE_RESPONSE | jq -r '.projectStatus.conditions[] | select(.status != "OK") | "- 🔴 Metric: \(.metricKey), Status: \(.status), Error threshold: \(.errorThreshold), Actual value: \(.actualValue)"'
             echo "::endgroup::"
             
             # Get project issues summary
@@ -102,12 +102,18 @@ jobs:
               --header "Authorization: Bearer ${SONAR_TOKEN}" \
               "${SONAR_HOST_URL}/api/issues/search?projectKeys=${PROJECT_KEY}&resolved=false&severities=BLOCKER,CRITICAL&ps=10")
             
-            echo "::group::Critical Issues (showing up to 10)"
+            echo "::group::🔥 Critical Issues (showing up to 10)"
             echo $ISSUES_RESPONSE | jq -r '.issues[] | "- [\(.severity)] \(.message) | In file: \(.component)"'
             echo "::endgroup::"
             
-            echo "::error::Quality Gate check failed with status: $STATUS"
-            echo "::error::Please check SonarQube analysis at ${SONAR_HOST_URL}/dashboard?id=${PROJECT_KEY}"
+            # Display more explicit error summary at the end for better visibility
+            echo "❌ ::error::Quality Gate failed with the following critical issues:"
+            echo $ISSUES_RESPONSE | jq -r '.issues[] | "::error::\(.severity): \(.message) | File: \(.component)"'
+            
+            echo "❌ ::error::Failed Quality Gate Metrics:"
+            echo $QUALITY_GATE_RESPONSE | jq -r '.projectStatus.conditions[] | select(.status != "OK") | "::error::\(.metricKey): Current \(.actualValue), needs to be \(.errorThreshold)"'
+            
+            echo "📊 ::error::Please check SonarQube analysis at ${SONAR_HOST_URL}/dashboard?id=${PROJECT_KEY}"
             exit 1
           fi
           
