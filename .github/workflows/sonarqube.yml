@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
 
       - name: Set up Python
-        if: matrix.tool != 'codeql'  # Snyk needs Python setup
+        if: matrix.tool != 'codeql'  # CodeQL has its own Python setup
         uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55
         with:
           python-version: '3.13'
@@ -48,10 +48,14 @@ jobs:
             ${{ runner.os }}-poetry-${{ matrix.tool }}-
             ${{ runner.os }}-poetry-
 
+      # Consolidated Poetry installation - used by multiple steps
       - name: Install Poetry
         if: matrix.tool != 'codeql'
         run: |
           pip install poetry
+          if [ "${{ matrix.tool }}" = "snyk" ]; then
+            pip install poetry-plugin-export
+          fi
           poetry --version
 
       - name: Install project dependencies
@@ -59,33 +63,18 @@ jobs:
         run: |
           poetry install --with dev --no-interaction
 
+      # Consolidated tool installation
       - name: Install analysis tools
-        if: matrix.tool != 'codeql' && matrix.tool != 'snyk' && matrix.tool != 'pyright' && matrix.tool != 'cyclonedx'
+        if: matrix.tool != 'codeql' && matrix.tool != 'snyk' && matrix.tool != 'pyright'
         run: |
-          poetry run pip install bandit ruff mypy flake8 pylint
-          poetry run bandit --version
-          poetry run ruff --version
-          poetry run mypy --version
-          poetry run flake8 --version
-          poetry run pylint --version
-
-      - name: Install Node.js for Pyright
-        if: matrix.tool == 'pyright'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install Pyright
-        if: matrix.tool == 'pyright'
-        run: |
-          npm install -g pyright
-          pyright --version
-
-      - name: Install CycloneDX
-        if: matrix.tool == 'cyclonedx'
-        run: |
-          poetry run pip install cyclonedx-bom
-          poetry run cyclonedx-py --version || echo "CycloneDX installed"
+            poetry run pip install bandit ruff mypy flake8 pylint cyclonedx-bom pyright
+            poetry run bandit --version
+            poetry run ruff --version
+            poetry run mypy --version
+            poetry run flake8 --version
+            poetry run pylint --version
+            poetry run cyclonedx-py --version
+            poetry run pyright --version
 
       - name: Setup Snyk CLI
         if: matrix.tool == 'snyk'
@@ -99,12 +88,13 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
           DEBUG: snyk*
         run: |
-          pip install poetry
-          pip install poetry-plugin-export
+          # Export dependencies from Poetry to requirements.txt
           poetry export --format requirements.txt --output requirements.txt --with dev
-          pip install black blake3 click colorama flake8 gmpy2 isort mccabe msgpack-types mypy-extensions pathspec psutil pycodestyle pyflakes setuptools types-requests types-setuptools typing-extensions
+          
+          # Run Snyk test with the generated requirements file
           snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif --skip-unresolved || snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif --skip-unresolved --all-projects
 
+      # Tool-specific analysis steps
       - name: Run Bandit
         if: matrix.tool == 'bandit'
         run: poetry run bandit -r . -o bandit_report.json --format json --exclude tests,.git || true
@@ -127,16 +117,13 @@ jobs:
 
       - name: Run Pyright
         if: matrix.tool == 'pyright'
-        run: pyright --outputjson > pyright_report.json || true
+        run: poetry run pyright --outputjson > pyright_report.json || true
 
       - name: Generate Software Bill of Materials (SBOM)
         if: matrix.tool == 'cyclonedx'
         run: |
-          # Install the specific package
-          pip install cyclonedx-bom
-          
-          # Run with explicit parameters
-          cyclonedx-py poetry \
+          # Run with explicit parameters (CycloneDX is already installed in the "Install analysis tools" step)
+          poetry run cyclonedx-py poetry \
             --with dev \
             -o cyclonedx_report.json \
             --of JSON \
@@ -193,13 +180,13 @@ jobs:
       - name: Process reports and prepare for SonarQube
         run: |
           mkdir -p processed_reports
-          
+            
           # Function to safely move reports
           safe_move_report() {
             local source_dir="$1"
             local report_file="$2"
             local target_file="$3"
-            
+              
             # First try direct path
             if [ -f "${source_dir}/${report_file}" ]; then
               echo "✅ Found ${report_file}"
@@ -229,43 +216,43 @@ jobs:
               return 1
             fi
           }
-          
+            
           # Initialize list of available report paths for SonarQube
           sonar_args=""
-          
+            
           # Process each report type
           safe_move_report "reports/bandit-report" "bandit_report.json" "processed_reports/bandit_report.json"
           if [ $? -eq 0 ]; then
             sonar_args="${sonar_args} -Dsonar.python.bandit.reportPaths=processed_reports/bandit_report.json"
           fi
-          
+            
           safe_move_report "reports/ruff-report" "ruff_report.json" "processed_reports/ruff_report.json"
           if [ $? -eq 0 ]; then
             sonar_args="${sonar_args} -Dsonar.python.ruff.reportPaths=processed_reports/ruff_report.json"
           fi
-          
+            
           safe_move_report "reports/mypy-report" "mypy_report.txt" "processed_reports/mypy_report.txt"
           if [ $? -eq 0 ]; then
             sonar_args="${sonar_args} -Dsonar.python.mypy.reportPaths=processed_reports/mypy_report.txt"
           fi
-          
+            
           safe_move_report "reports/flake8-report" "flake8_report.txt" "processed_reports/flake8_report.txt"
           if [ $? -eq 0 ]; then
             sonar_args="${sonar_args} -Dsonar.python.flake8.reportPaths=processed_reports/flake8_report.txt"
           fi
-          
+            
           safe_move_report "reports/pylint-report" "pylint_report.json" "processed_reports/pylint_report.json"
           if [ $? -eq 0 ]; then
             sonar_args="${sonar_args} -Dsonar.python.pylint.reportPaths=processed_reports/pylint_report.json"
           fi
-          
+            
           # Process SARIF reports and combine into a single list if both exist
           sarif_reports=""
           safe_move_report "reports/codeql-report" "codeql_report.sarif" "processed_reports/codeql_report.sarif"
           if [ $? -eq 0 ]; then
             sarif_reports="processed_reports/codeql_report.sarif"
           fi
-          
+            
           safe_move_report "reports/snyk-report" "snyk_report.sarif" "processed_reports/snyk_report.sarif"
           if [ $? -eq 0 ]; then
             if [ -n "$sarif_reports" ]; then
@@ -274,24 +261,24 @@ jobs:
               sarif_reports="processed_reports/snyk_report.sarif"
             fi
           fi
-          
+            
           if [ -n "$sarif_reports" ]; then
             sonar_args="${sonar_args} -Dsonar.sarifReportPaths=${sarif_reports}"
           fi
-          
+            
           safe_move_report "reports/pyright-report" "pyright_report.json" "processed_reports/pyright_report.json"
           if [ $? -eq 0 ]; then
             sonar_args="${sonar_args} -Dsonar.externalIssuesReportPaths=processed_reports/pyright_report.json"
           fi
-          
+            
           safe_move_report "reports/cyclonedx-report" "cyclonedx_report.json" "processed_reports/cyclonedx_report.json"
           if [ $? -eq 0 ]; then
             sonar_args="${sonar_args} -Dsonar.dependencyCheck.jsonReportPath=processed_reports/cyclonedx_report.json"
           fi
-          
+            
           # Store SonarQube args in environment variable for next step
           echo "SONAR_EXTRA_ARGS=${sonar_args}" >> $GITHUB_ENV
-          
+            
           # Print summary
           echo "✨ Report processing complete. SonarQube will use the following reports:"
           echo "${sonar_args}"
