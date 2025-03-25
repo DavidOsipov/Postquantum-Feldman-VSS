@@ -70,7 +70,7 @@ jobs:
         run: mypy . --output=json --output-file mypy_report.json
 
       - name: Upload report artifact
-        uses: actions/upload-artifact@5076952e8b3fbcaaacbf7d9c6376b5c0719038f8
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ${{ matrix.tool }}-report
           path: ${{ matrix.tool }}_report.json
