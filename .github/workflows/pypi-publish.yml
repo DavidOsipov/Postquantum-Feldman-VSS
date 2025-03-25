@@ -90,7 +90,22 @@ jobs:
           STATUS=$(echo $QUALITY_GATE_RESPONSE | jq -r '.projectStatus.status')
           echo "Quality Gate Status: $STATUS"
           
+          # Print detailed condition information when status is not OK
           if [ "$STATUS" != "OK" ]; then
+            echo "::group::Quality Gate Failure Details"
+            echo "Failed conditions:"
+            echo $QUALITY_GATE_RESPONSE | jq -r '.projectStatus.conditions[] | select(.status != "OK") | "- Metric: \(.metricKey), Status: \(.status), Error threshold: \(.errorThreshold), Actual value: \(.actualValue)"'
+            echo "::endgroup::"
+            
+            # Get project issues summary
+            ISSUES_RESPONSE=$(curl --silent --fail --show-error \
+              --header "Authorization: Bearer ${SONAR_TOKEN}" \
+              "${SONAR_HOST_URL}/api/issues/search?projectKeys=${PROJECT_KEY}&resolved=false&severities=BLOCKER,CRITICAL&ps=10")
+            
+            echo "::group::Critical Issues (showing up to 10)"
+            echo $ISSUES_RESPONSE | jq -r '.issues[] | "- [\(.severity)] \(.message) | In file: \(.component)"'
+            echo "::endgroup::"
+            
             echo "::error::Quality Gate check failed with status: $STATUS"
             echo "::error::Please check SonarQube analysis at ${SONAR_HOST_URL}/dashboard?id=${PROJECT_KEY}"
             exit 1
