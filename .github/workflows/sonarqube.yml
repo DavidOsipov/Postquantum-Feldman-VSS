@@ -38,16 +38,26 @@ jobs:
           restore-keys: |
             pip-poetry-
 
-      - name: Install project dependencies
+      - name: Install Poetry
         if: matrix.tool != 'codeql'
         run: |
           pip install poetry
+          poetry --version
+
+      - name: Install project dependencies
+        if: matrix.tool != 'codeql'
+        run: |
           poetry install --with dev --no-interaction
 
       - name: Install analysis tools
         if: matrix.tool != 'codeql' && matrix.tool != 'snyk'
         run: |
-          pip install bandit ruff mypy flake8 pylint
+          poetry run pip install bandit ruff mypy flake8 pylint
+          poetry run bandit --version
+          poetry run ruff --version
+          poetry run mypy --version
+          poetry run flake8 --version
+          poetry run pylint --version
 
       - name: Setup Snyk CLI
         if: matrix.tool == 'snyk'
@@ -67,7 +77,37 @@ jobs:
             --strict-out-of-sync=false \
             --sarif-file-output=snyk_report.sarif
 
-      # ... [keep other tool steps unchanged] ...
+      - name: Run Bandit
+        if: matrix.tool == 'bandit'
+        run: poetry run bandit -r . -o bandit_report.json --format json --exclude tests,.git || true
+
+      - name: Run Ruff
+        if: matrix.tool == 'ruff'
+        run: poetry run ruff check . --output-format json --output-file ruff_report.json --exclude tests,.git || true
+
+      - name: Run Mypy
+        if: matrix.tool == 'mypy'
+        run: poetry run mypy . 2>&1 | tee mypy_report.txt || true
+
+      - name: Run Flake8
+        if: matrix.tool == 'flake8'
+        run: poetry run flake8 . --output-file flake8_report.txt --format=pylint || true
+
+      - name: Run Pylint
+        if: matrix.tool == 'pylint'
+        run: poetry run pylint --recursive=y . --output-format=json > pylint_report.json || true
+
+      - name: Initialize CodeQL
+        if: matrix.tool == 'codeql'
+        uses: github/codeql-action/init@main
+        with:
+          languages: python
+
+      - name: Perform CodeQL Analysis
+        if: matrix.tool == 'codeql'
+        uses: github/codeql-action/analyze@main
+        with:
+          output: codeql_report.sarif
 
       - name: Upload report artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -79,7 +119,35 @@ jobs:
     needs: Analyze
     runs-on: ubuntu-latest
     steps:
-      # ... [keep existing SonarQube steps] ...
+      - name: Checkout code
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+        with:
+          fetch-depth: 0
+
+      - name: Download analysis reports
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e
+        with:
+          path: reports
+
+      - name: Move reports to working directory
+        run: |
+          mv reports/bandit-report/bandit_report.json .
+          mv reports/ruff-report/ruff_report.json .
+          mv reports/mypy-report/mypy_report.txt .
+          mv reports/flake8-report/flake8_report.txt .
+          mv reports/pylint-report/pylint_report.json .
+          mv reports/codeql-report/codeql_report.sarif .
+          mv reports/snyk-report/snyk_report.sarif .
+
+      - name: Check if reports exist
+        run: |
+          for report in bandit_report.json ruff_report.json mypy_report.txt flake8_report.txt pylint_report.json codeql_report.sarif snyk_report.sarif; do
+            if [ ! -f "$report" ]; then
+              echo "$report not found. Exiting."
+              exit 1
+            fi
+          done
+
       - name: Analyze with SonarQube
         uses: SonarSource/sonarqube-scan-action@aa494459d7c39c106cc77b166de8b4250a32bb97
         env:
