@@ -42,7 +42,7 @@ jobs:
           python-version: '3.13'
 
       - name: Cache pip dependencies
-        uses: actions/cache@e991338e5258e38b11407e17300c4f218beff3f8
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
         with:
           path: /usr/local/lib/python3.13/site-packages
           key: pip-${{ hashFiles('pyproject.toml') }}
