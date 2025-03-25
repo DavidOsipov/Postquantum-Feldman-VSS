@@ -4539,16 +4539,16 @@ class FeldmanVSS:
         party_id: int
         commitments: CommitmentList
         for party_id, commitments in zero_commitments.items():
-            if not isinstance(commitments, list) or not commitments:
+             if not isinstance(commitments, list) or not commitments:
                 detailed_msg = (
                     f"Invalid commitment format for party {party_id}: expected non-empty list"
                 )
-                message = "Invalid data structure"
-                self._raise_sanitized_error(TypeError, message, detailed_msg)
+                message_str = "Invalid data structure"
+                self._raise_sanitized_error(TypeError, message_str, detailed_msg)
             if not all(isinstance(c, tuple) and len(c) >= 2 for c in commitments):
                 detailed_msg = f"Invalid commitment format for party {party_id}: expected list of (commitment, randomizer) tuples"
-                message = "Invalid data structure"
-                self._raise_sanitized_error(TypeError, message, detailed_msg)
+                message_str = "Invalid data structure"
+                self._raise_sanitized_error(TypeError, message_str, detailed_msg)
 
         # Initialize result storage
         consistency_results: Dict[Tuple[int, int], bool] = {}
