@@ -84,7 +84,7 @@ blake3 = "==1.0.4"
 psutil = { version = "==7.0.0", optional = true }
 
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 black = ">=24.0"
 isort = ">=5.10"
 flake8 = ">=7.0"
