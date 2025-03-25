@@ -1,32 +1,4 @@
-<!-- omit in toc -->
-# Contributing to PostQuantum Feldman VSS
-
-First off, thanks for taking the time to contribute! ❤️
-
-All types of contributions are encouraged and valued. See the [Table of Contents](#table-of-contents) for different ways to help and details about how this project handles them. Please make sure to read the relevant section before making your contribution. It will make it a lot easier for us maintainers and smooth out the experience for all involved. The community looks forward to your contributions. 🎉
-
-> And if you like the project, but just don't have time to contribute, that's fine. There are other easy ways to support the project and show your appreciation, which we would also be very happy about:
-> - Star the project
-> - Tweet about it
-> - Refer this project in your project's readme
-> - Mention the project at local meetups and tell your friends/colleagues
-
-<!-- omit in toc -->
-## Table of Contents
-
-- [Code of Conduct](#code-of-conduct)
-- [I Have a Question](#i-have-a-question)
-  - [I Want To Contribute](#i-want-to-contribute)
-  - [Reporting Bugs](#reporting-bugs)
-  - [Suggesting Enhancements](#suggesting-enhancements)
-  - [Your First Code Contribution](#your-first-code-contribution)
-  - [Improving The Documentation](#improving-the-documentation)
-- [Styleguides](#styleguides)
-  - [Commit Messages](#commit-messages)
-- [Join The Project Team](#join-the-project-team)
-
-
-## Code of Conduct
+# Code of Conduct
 
 This project and everyone participating in it is governed by the
 [PostQuantum Feldman VSS Code of Conduct](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/blob/main/CODE_OF_CONDUCT.md).
@@ -89,8 +61,7 @@ A good bug report shouldn't leave others needing to chase you up for more inform
 <!-- omit in toc -->
 #### How Do I Submit a Good Bug Report?
 
-> You must never report security related issues, vulnerabilities or bugs including sensitive information to the issue tracker, or elsewhere in public. Instead sensitive bugs must be sent by email to <personal@david-osipov.vision>.
-<!-- You may add a PGP key to allow the messages to be sent encrypted as well. -->
+> You must never report security related issues, vulnerabilities or bugs including sensitive information to the issue tracker, or elsewhere in public. Instead refer to [Security Policy](https://github.com/DavidOsipov/PostQuantum-Feldman-VSS/blob/main/SECURITY.md).
 
 We use GitHub issues to track bugs and errors. If you run into an issue with the project:
 
@@ -134,10 +105,23 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/DavidO
 <!-- You might want to create an issue template for enhancement suggestions that can be used as a guide and that defines the structure of the information to be included. If you do so, reference it here in the description. -->
 
 ### Your First Code Contribution
-<!-- TODO
-include Setup of env, IDE and typical getting started instructions?
 
--->
+This project uses [Black](https://github.com/psf/black) for code formatting and [isort](https://github.com/PyCQA/isort) for import sorting.  Please ensure your code adheres to these standards before submitting a pull request.
+
+You can install these tools using pip:
+
+```bash
+pip install black isort
+```
+
+Run the following commands to format your code:
+
+```bash
+black .
+isort .
+```
+
+Additionally, we use [SonarCloud](https://sonarcloud.io/project/overview?id=DavidOsipov_PostQuantum-Feldman-VSS) for code quality analysis.  Please review the reports and address any issues highlighted.
 
 ### Improving The Documentation
 <!-- TODO
