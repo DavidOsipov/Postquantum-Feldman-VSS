@@ -390,5 +390,5 @@ jobs:
             -Dsonar.python.version=3.10,3.11,3.12,3.13
             -Dsonar.languages=python
             -Dsonar.python.analyzeGeneratedCode=true
-            -Dsonar.verbose=true
+            -Dsonar.verbose=false
             ${{ env.SONAR_EXTRA_ARGS }}
