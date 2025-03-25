@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        tool: [bandit, ruff, mypy, flake8, pylint, codeql, snyk, pyright, cyclonedx]
+        tool: [bandit, ruff, mypy, flake8, pylint, codeql, snyk, pyright]
     steps:
       - name: Checkout code
         uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
@@ -65,10 +65,6 @@ jobs:
             snyk)
               # Snyk only needs dependency export
               ;;
-            cyclonedx)
-              # CycloneDX needs core dependencies for accurate SBOM
-              poetry install --only main --no-interaction
-              ;;
             *)
               # Analysis tools need dev dependencies
               poetry install --with dev --no-interaction
@@ -103,10 +99,6 @@ jobs:
             pyright)
               poetry run pip install pyright
               poetry run pyright --version
-              ;;
-            cyclonedx)
-              poetry run pip install cyclonedx-bom
-              poetry run cyclonedx-py --version
               ;;
             *)
               echo "Unknown tool: ${{ matrix.tool }}"
@@ -156,44 +148,6 @@ jobs:
       - name: Run Pyright
         if: matrix.tool == 'pyright'
         run: poetry run pyright --outputjson > pyright_report.json || true
-
-      - name: Generate Software Bill of Materials (SBOM)
-        if: matrix.tool == 'cyclonedx'
-        run: |
-          # Run with explicit parameters (CycloneDX is already installed in the "Install analysis tools" step)
-          poetry run cyclonedx-py poetry \
-            --with dev \
-            -o cyclonedx_report.json \
-            --of JSON \
-            --validate \
-            --all-extras \
-            --mc-type application \
-            .
-          
-          # Improved error handling with more detailed fallback SBOM
-          if [ -f "cyclonedx_report.json" ]; then
-            echo "✅ Successfully generated cyclonedx_report.json"
-            # Show first few lines for debugging
-            head -n 20 cyclonedx_report.json
-          else
-            echo "❌ Failed to generate cyclonedx_report.json"
-            # Create more detailed minimal valid file
-            echo '{
-              "bomFormat": "CycloneDX",
-              "specVersion": "1.5",
-              "serialNumber": "urn:uuid:'$(uuidgen)'",
-              "version": 1,
-              "metadata": {
-                "timestamp": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
-                "component": {
-                  "name": "PostQuantum-Feldman-VSS",
-                  "type": "application",
-                  "bom-ref": "pkg:github/DavidOsipov/PostQuantum-Feldman-VSS"
-                }
-              },
-              "components": []
-            }' > cyclonedx_report.json
-          fi
 
       - name: Initialize CodeQL
         if: matrix.tool == 'codeql'
@@ -323,11 +277,6 @@ jobs:
             sonar_args="${sonar_args} -Dsonar.externalIssuesReportPaths=processed_reports/pyright_report.json"
           fi
             
-          safe_move_report "reports/cyclonedx-report" "cyclonedx_report.json" "processed_reports/cyclonedx_report.json"
-          if [ $? -eq 0 ]; then
-            sonar_args="${sonar_args} -Dsonar.dependencyCheck.jsonReportPath=processed_reports/cyclonedx_report.json"
-          fi
-            
           # Store SonarQube args in environment variable for next step
           echo "SONAR_EXTRA_ARGS=${sonar_args}" >> $GITHUB_ENV
             
@@ -345,6 +294,6 @@ jobs:
           args: >
             -Dsonar.projectKey=DavidOsipov_PostQuantum-Feldman-VSS
             -Dsonar.organization=davidosipov
-            -Dsonar.python.version=3.10-3.13
+            -Dsonar.python.version=3.10,3.11,3.12,3.13
             -Dsonar.languages=python
             ${{ env.SONAR_EXTRA_ARGS }}
