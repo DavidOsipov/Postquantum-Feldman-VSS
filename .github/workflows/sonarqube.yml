@@ -43,9 +43,8 @@ jobs:
             ~/.cache/pip
             ~/.cache/pypoetry
             /usr/local/lib/python3.13/site-packages
-          key: ${{ runner.os }}-poetry-${{ matrix.tool }}-${{ hashFiles('**/poetry.lock', 'pyproject.toml') }}
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock', 'pyproject.toml') }}
           restore-keys: |
-            ${{ runner.os }}-poetry-${{ matrix.tool }}-
             ${{ runner.os }}-poetry-
 
       # Consolidated Poetry installation - used by multiple steps
@@ -61,20 +60,59 @@ jobs:
       - name: Install project dependencies
         if: matrix.tool != 'codeql'
         run: |
-          poetry install --with dev --no-interaction
+          # Only install the dependencies needed for each specific tool
+          case "${{ matrix.tool }}" in
+            snyk)
+              # Snyk only needs dependency export
+              ;;
+            cyclonedx)
+              # CycloneDX needs core dependencies for accurate SBOM
+              poetry install --only main --no-interaction
+              ;;
+            *)
+              # Analysis tools need dev dependencies
+              poetry install --with dev --no-interaction
+              ;;
+          esac
 
-      # Consolidated tool installation
+      # Optimized tool installation - only install the tool being used
       - name: Install analysis tools
-        if: matrix.tool != 'codeql' && matrix.tool != 'snyk' && matrix.tool != 'pyright'
+        if: matrix.tool != 'codeql' && matrix.tool != 'snyk'
         run: |
-            poetry run pip install bandit ruff mypy flake8 pylint cyclonedx-bom pyright
-            poetry run bandit --version
-            poetry run ruff --version
-            poetry run mypy --version
-            poetry run flake8 --version
-            poetry run pylint --version
-            poetry run cyclonedx-py --version
-            poetry run pyright --version
+          case "${{ matrix.tool }}" in
+            bandit)
+              poetry run pip install bandit
+              poetry run bandit --version
+              ;;
+            ruff)
+              poetry run pip install ruff
+              poetry run ruff --version
+              ;;
+            mypy)
+              poetry run pip install mypy types-setuptools types-requests
+              poetry run mypy --version
+              ;;
+            flake8)
+              poetry run pip install flake8
+              poetry run flake8 --version
+              ;;
+            pylint)
+              poetry run pip install pylint
+              poetry run pylint --version
+              ;;
+            pyright)
+              poetry run pip install pyright
+              poetry run pyright --version
+              ;;
+            cyclonedx)
+              poetry run pip install cyclonedx-bom
+              poetry run cyclonedx-py --version
+              ;;
+            *)
+              echo "Unknown tool: ${{ matrix.tool }}"
+              exit 1
+              ;;
+          esac
 
       - name: Setup Snyk CLI
         if: matrix.tool == 'snyk'
@@ -132,15 +170,29 @@ jobs:
             --mc-type application \
             .
           
-          # Add error handling
+          # Improved error handling with more detailed fallback SBOM
           if [ -f "cyclonedx_report.json" ]; then
             echo "✅ Successfully generated cyclonedx_report.json"
             # Show first few lines for debugging
             head -n 20 cyclonedx_report.json
           else
             echo "❌ Failed to generate cyclonedx_report.json"
-            # Create minimal valid file
-            echo '{"bomFormat":"CycloneDX","specVersion":"1.5","version":1,"metadata":{"component":{"name":"PostQuantum-Feldman-VSS","type":"application"}},"components":[]}' > cyclonedx_report.json
+            # Create more detailed minimal valid file
+            echo '{
+              "bomFormat": "CycloneDX",
+              "specVersion": "1.5",
+              "serialNumber": "urn:uuid:'$(uuidgen)'",
+              "version": 1,
+              "metadata": {
+                "timestamp": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
+                "component": {
+                  "name": "PostQuantum-Feldman-VSS",
+                  "type": "application",
+                  "bom-ref": "pkg:github/DavidOsipov/PostQuantum-Feldman-VSS"
+                }
+              },
+              "components": []
+            }' > cyclonedx_report.json
           fi
 
       - name: Initialize CodeQL
