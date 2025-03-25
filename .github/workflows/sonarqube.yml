@@ -67,7 +67,7 @@ jobs:
 
       - name: Run Mypy
         if: matrix.tool == 'mypy'
-        run: mypy . --output=json --output-file mypy_report.json
+        run: mypy . > mypy_report.txt
 
       - name: Upload report artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -91,11 +91,11 @@ jobs:
         run: |
           mv reports/bandit-report/bandit_report.json .
           mv reports/ruff-report/ruff_report.json .
-          mv reports/mypy-report/mypy_report.json .
+          mv reports/mypy-report/mypy_report.txt .
 
       - name: Check if reports exist
         run: |
-          for report in bandit_report.json ruff_report.json mypy_report.json; do
+          for report in bandit_report.json ruff_report.json mypy_report.txt; do
             if [ ! -f "$report" ]; then
               echo "$report not found. Exiting."
               exit 1
@@ -114,6 +114,6 @@ jobs:
             -Dsonar.organization=davidosipov
             -Dsonar.python.bandit.reportPaths=bandit_report.json
             -Dsonar.python.ruff.reportPaths=ruff_report.json
-            -Dsonar.python.mypy.reportPaths=mypy_report.json
+            -Dsonar.python.mypy.reportPaths=mypy_report.txt
             -Dsonar.python.version=3.10, 3.11, 3.12, 3.13
             -Dsonar.languages=python
