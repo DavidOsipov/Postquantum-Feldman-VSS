@@ -113,16 +113,16 @@ exclude_lines = [
 
 [tool.isort]
 profile = "black"
-line_length = 100
+line_length = 120
 known_first_party = ["feldman_vss"]
 
 [tool.black]
-line-length = 100
+line-length = 120
 target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
 
 
 [tool.flake8]
-max-line-length = 100
+max-line-length = 120
 extend-ignore = ["E203", "W503", "E501"]
 per-file-ignores = ["__init__.py:F401"]
 
@@ -194,3 +194,168 @@ severity = "medium"
 [tool.bandit.log_level]
 # Set log level to filter out warnings
 level = "info"
+
+[tool.ruff]
+line-length = 140
+fixable = ["ALL"]
+target-version = "py310"  # Consistent with requires-python
+select = [
+    "F",  # Pyflakes
+    "E",  # pycodestyle
+    "W",  # pycodestyle
+    "C90", # mccabe
+    "I",  # isort
+    "N",  # pep8-naming
+    "UP", # pyupgrade
+    "S", # flake8-bandit
+    "RUF", # Ruff-specific rules
+    "SIM", # flake8-simplify
+    "ISC", # flake8-implicit-str-concat
+    "G",   # flake8-logging-format
+    "TID", # flake8-tidy-imports
+    "ARG", # flake8-unused-arguments
+    "PTH", # flake8-use-pathlib
+    "NPY", # NumPy specific rules
+    "PD",  # pandas-vet
+    "PL", # Pylint
+    "PIE",  # flake8-pie
+    "TRY", # tryceratops
+    "FURB", # refurb
+]
+
+ignore = [
+  "E203", # Whitespace before ':' (conflicts with Black)
+  "PLR0913", # Too many arguments to function call
+  "PLR0915", # Too many statements
+  "PLR1702", # Too many nested blocks
+  "PLR0912", # Too many branches
+  "S101",    # Use of assert detected (we'll manage asserts in tests separately)
+  "S104",  # Possible binding to all interfaces.  This is intentional.
+  "S105",  # hardcoded-password-string
+  "S106",  # hardcoded-password-func-arg
+  "S107",  # hardcoded-password-default
+  "SIM115", # context manager, false positives
+  "ERA001", # Commented-out code.  This is sometimes desirable, and not a vulnerability.
+  "TRY003", # raise-vanilla-args, allow message customization.
+  "TRY301",  # raise within try.  This is valid in many cases.
+  "C901", # Too complex.  We'll handle complexity on a case-by-case basis.
+  "N806",  # Variable names; too restrictive
+  "PLW0603", # global-statement, we are aware of the implications
+  "PLW1514", # unspecified-encoding, default to utf-8 if not specified
+  "PLR0911", # Too many return statements
+  "PLR0914",  # Too many local variables
+  "PLR0206", # property-with-parameters, dataclasses with default values for properties.
+  "PLW0120", # useless-else-on-loop, improves readability
+  "PLW0602", # global-variable-not-assigned, allow globals for configuration
+  "PLR0402", # manual-from-import, allow for clarity in some cases
+  "F841", # Local variable is assigned to but never used.  False positives with type-checking.
+  "F401", # Unused import, for type checking.
+  "RUF009", # Function call in dataclass default.  False-positive with cached_property.
+  "RUF012", # Mutable-class-default, intentional with `field(default_factory=list)`
+  "RUF029",  # unused-async.  False positives with pytest fixtures, sometimes.
+  "SIM108", # if-else-block-instead-of-if-exp, ternary can reduce readability
+  "SIM401", # if-else-block-instead-of-dict-get, dict.get() is not always more readable
+  "PLR6301", # no-self-use.  Too strict, often clearer to keep 'self'.
+  "PLR1711", # useless-return, sometimes used for clarity.
+  "PLR1722", # sys-exit-alias, sometimes clearer.
+  "PLR2004", # magic-value-comparison.  Numbers are sometimes obvious.
+  "PLW0108",  # unnecessary-lambda.  Sometimes more readable.
+  "PLW0604", # global-at-module-level, we are aware of the implications
+  "UP007",   # non-pep604-annotation-union, prefer typing.Union for compatibility
+  "UP037", # quoted-annotation, remove once 3.10 is min supported version
+  "B904",  # raise-without-from-inside-except
+  "E741", # Ambiguous variable name ('l', 'O', 'I').  Sometimes unavoidable.
+  "N818",  # Exception name, not always appropriate to have Error suffix.
+  "PERF203", # try-except-in-loop, sometimes necessary.
+  "PLW0127", # self-assigning-variable.
+  "PLR1736", # unnecessary-list-index-lookup.
+  "RUF021", # parenthesize-chained-operators.  Sometimes clear without parens.
+  "RUF013", # implicit-optional.  Stricter than PEP 484.
+  "RUF034", # useless-if-else. Sometimes clearer with the explicit `else`.
+  "RUF036", # none-not-at-end-of-union.  Stylistic preference.
+  "RUF045", # implicit-class-var-in-dataclass.
+  "UP004",  # useless-object-inheritance.  Stylistic preference.
+  "UP005", # Deprecated unittest alias, for backwards compatibility.
+  "UP038", # non-pep604-isinstance, keep for compatibility
+  "UP045", # non-pep604-annotation-optional, for compatibility
+  "RUF052",  # unused-dummy-variable. False positive with contextlib.suppress
+  "RUF059",  # unused-unpacked-variable. False positive with contextlib.suppress
+  "PLW0129", # assert-on-string-literal, sometimes used to show intent
+  "PLR1733", # unnecessary-dict-index-lookup.
+  "PLW3301", # nested-min-max.
+  "RUF058", # starmap-zip.
+  "RUF038", # redundant-bool-literal
+  "RUF041",  # unnecessary-nested-literal.
+  "RUF046", # unnecessary-cast-to-int.
+  "RUF057", # unnecessary-round.
+  "RUF032", # decimal-from-float-literal.
+  "PLR6201", # literal-membership
+  "PLR6104", # non-augmented-assignment
+  "PLR0202", # no-classmethod-decorator
+  "PLR0203", # no-staticmethod-decorator
+  "PLC1901", # compare-to-empty-string
+  "PLC2701", # import-private-name
+  "PLR0133", # comparison-of-constant
+  "PLE0304", # invalid-bool-return-type
+  "PLE1141", # dict-iter-missing-items
+  "PLC0208", # iteration-over-set
+  "PLE4703", # modified-iterating-set
+  "PLW0177", # nan-comparison
+  "PLW0244", # redefined-slots-in-subclass
+  "PLW1641", # eq-without-hash
+  "PLW3201", # bad-dunder-method-name
+  "UP042", # replace-str-enum
+  "UP046", # non-pep695-generic-class
+  "UP047", # non-pep695-generic-function
+  "UP049", # private-type-parameter
+  "RUF049", # dataclass-enum
+  "RUF053", # class-with-mixed-type-vars
+  "RUF054", # indented-form-feed
+  "RUF055", # unnecessary-regular-expression
+  "RUF056", # falsy-dict-get-fallback
+  "RUF016", # invalid-index-type
+  "RUF031", # incorrectly-parenthesized-tuple-in-subscript
+  "RUF039", # unraw-re-pattern
+  "RUF043", # pytest-raises-ambiguous-pattern
+  "FURB110",  # if-exp-instead-of-or-operator.
+  "FURB113",  # repeated-append.
+  "FURB116",  # f-string-number-format.
+  "FURB122",  # for-loop-writes.
+  "FURB131",  # delete-full-slice.
+  "FURB132",  # check-and-remove-from-set.
+  "FURB136",  # if-expr-min-max.
+  "FURB140",  # reimplemented-starmap.
+  "FURB142",  # for-loop-set-mutations.
+  "FURB145",  # slice-copy.
+  "FURB148",  # unnecessary-enumerate.
+  "FURB152",  # math-constant.
+  "FURB154",  # repeated-global.
+  "FURB156",  # hardcoded-string-charset.
+  "FURB157",  # verbose-decimal-constructor.
+  "FURB162",  # fromisoformat-replace-z.
+  "FURB164",  # unnecessary-from-float.
+  "FURB166",  # int-on-sliced-str.
+  "FURB171",  # single-item-membership-test.
+  "FURB180",  # meta-class-abc-meta.
+  "FURB188",  # slice-to-remove-prefix-or-suffix.
+  "FURB189",  # subclass-builtin.
+  "FURB192",  # sorted-min-max.
+  "PLC1802", # len-test
+  "RUF017", # quadratic-list-summation
+  "RUF018", # assignment-in-assert
+  "RUF027", # missing-f-string-syntax
+]
+
+
+[tool.ruff.per-file-ignores]
+"tests/*.py" = ["S101", "F841", "RUF018"]  # Allow asserts and unused vars in tests
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

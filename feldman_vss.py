@@ -61,10 +61,10 @@ The memory requirements scale approximately as O(t² * bit_length).
 
 **Python Version Compatibility:**
 
--   **Minimum Supported Version: Python 3.8**
+-   **Minimum Supported Version: Python 3.10**
 -   **Recommended Version: Python 3.13.2 (or later)**
 
-While the library is designed to be compatible with Python 3.8 and above, using
+While the library is designed to be compatible with Python 3.10 and above, using
 the latest stable release (currently 3.13.2) is highly recommended for optimal
 performance, security, and access to the latest language features.
 
@@ -139,7 +139,9 @@ Developer: David Osipov
 # ]
 # ///
 
+import contextlib
 import hashlib
+import importlib.util
 import logging
 import random
 import secrets
@@ -147,28 +149,24 @@ import threading
 import time
 import traceback
 import warnings
-import importlib.util
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from collections import OrderedDict
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import (
     Any,
-    TypeVar,
     Generic,
-    NoReturn,
-    TypedDict,
     Literal,
-    Union,
+    NoReturn,
     Optional,
-    List,
-    Tuple,
-    Dict,
-    Set,
+    TypedDict,
+    TypeVar,
+    Union,
     cast,
 )
-from dataclasses import dataclass
-from gmpy2 import mpz
+
 import msgpack
+from gmpy2 import mpz
 
 # Import BLAKE3 for cryptographic hashing (faster and more secure than SHA3-256)
 
@@ -176,7 +174,7 @@ import msgpack
 blake3 = None
 
 # Check if blake3 is available
-has_blake3 = importlib.util.find_spec("blake3") is not None
+has_blake3: bool = importlib.util.find_spec("blake3") is not None
 if has_blake3:
     try:
         import blake3
@@ -193,7 +191,7 @@ try:
     import gmpy2
 except ImportError as exc:
     raise ImportError(
-        "gmpy2 library is required for this module. " "Install gmpy2 with: pip install gmpy2"
+        "gmpy2 library is required for this module. Install gmpy2 with: pip install gmpy2"
     ) from exc
 
 # Import psutil for memory monitoring if available
@@ -215,52 +213,52 @@ __version__ = "0.8.1b1"
 
 # The above code is defining the `__all__` list in a Python module. This list specifies the names of
 # the symbols that should be exported when using the `from module import *` syntax.
-__all__: List[str] = [
-    "FeldmanVSS",
-    "VSSConfig",
-    "get_feldman_vss",
-    "create_vss_from_shamir",
-    "integrate_with_pedersen",
-    "create_dual_commitment_proof",
-    "verify_dual_commitments",
-    "SerializationError",
-    "SecurityError",
-    "VerificationError",
-    "ParameterError",
+__all__: list[str] = [
+    "ByzantineDetectionResultDict",
+    "ByzantineEvidenceDict",
+    "CommitmentList",
     "CyclicGroup",
-    "SafeLRUCache",
+    "DualCommitmentProofDict",
+    "EvidenceEntryDict",
+    "FeldmanVSS",
+    "FieldElement",
+    "ForensicDataDict",
+    "HashCommitment",
+    "HashFunc",
+    "IntegrationResultDict",
+    "InvalidityProofDict",
     "MemoryMonitor",
-    "constant_time_compare",
-    "validate_timestamp",
-    "estimate_mpz_size",
-    "estimate_mpz_operation_memory",
-    "estimate_exp_result_size",
-    "get_system_memory",
+    "MemoryUsageStatsDict",
+    "ParameterError",
+    "ProofDict",
+    "Randomizer",
+    "RedundantExecutorFunc",
+    "RefreshingResult",
+    "SafeLRUCache",
+    "SecurityError",
+    "SecurityWarning",
+    "SerializationError",
+    "ShareDict",
+    "SharePoint",
+    "VSSConfig",
+    "VerificationDataDict",
+    "VerificationError",
+    "VerificationResult",
+    "VerificationSummaryDict",
     "check_memory_safety",
     "compute_checksum",
+    "constant_time_compare",
+    "create_dual_commitment_proof",
+    "create_vss_from_shamir",
+    "estimate_exp_result_size",
+    "estimate_mpz_operation_memory",
+    "estimate_mpz_size",
+    "get_feldman_vss",
+    "get_system_memory",
+    "integrate_with_pedersen",
     "secure_redundant_execution",
-    "SecurityWarning",
-    "EvidenceEntryDict",
-    "ByzantineEvidenceDict",
-    "FieldElement",
-    "SharePoint",
-    "ShareDict",
-    "Randomizer",
-    "InvalidityProofDict",
-    "VerificationSummaryDict",
-    "VerificationDataDict",
-    "MemoryUsageStatsDict",
-    "ForensicDataDict",
-    "ByzantineDetectionResultDict",
-    "DualCommitmentProofDict",
-    "IntegrationResultDict",
-    "HashFunc",
-    "RedundantExecutorFunc",
-    "HashCommitment",
-    "CommitmentList",
-    "ProofDict",
-    "VerificationResult",
-    "RefreshingResult",
+    "validate_timestamp",
+    "verify_dual_commitments",
 ]
 # Security parameters
 VSS_VERSION = f"VSS-{__version__}"
@@ -293,140 +291,95 @@ SAFE_PRIMES: dict[int, int] = {
 
 # Type definitions
 # More specific TypedDict definitions for nested structures
-EvidenceEntryDict = TypedDict(
-    "EvidenceEntryDict",
-    {"party_id": int, "action": str, "data": dict[str, Union[int, str, bool]], "timestamp": int},
-)
+class EvidenceEntryDict(TypedDict):
+    party_id: int
+    action: str
+    data: dict[str, Union[int, str, bool]]
+    timestamp: int
 
-ByzantineEvidenceDict = TypedDict(
-    "ByzantineEvidenceDict",
-    {"type": str, "evidence": list[EvidenceEntryDict], "timestamp": int, "signature": str},
-)
+class ByzantineEvidenceDict(TypedDict):
+    type: str
+    evidence: list[EvidenceEntryDict]
+    timestamp: int
+    signature: str
 
 FieldElement = Union[int, "gmpy2.mpz"]  # Ensure only int and gmpy2.mpz are allowed.
 SharePoint = tuple[FieldElement, FieldElement]  # (x, y) coordinate
 ShareDict = dict[int, SharePoint]  # Maps participant ID to share
 Randomizer = FieldElement  # Randomizer values for commitments
 
-InvalidityProofDict = TypedDict(
-    "InvalidityProofDict",
-    {
-        "party_id": int,
-        "participant_id": int,
-        "share_x": FieldElement,
-        "share_y": FieldElement,
-        "expected_commitment": FieldElement,
-        "actual_commitment": FieldElement,
-        "combined_randomizer": FieldElement,
-        "timestamp": int,
-        "signature": str,
-    },
-)
+class InvalidityProofDict(TypedDict):
+    party_id: int
+    participant_id: int
+    share_x: FieldElement
+    share_y: FieldElement
+    expected_commitment: FieldElement
+    actual_commitment: FieldElement
+    combined_randomizer: FieldElement
+    timestamp: int
+    signature: str
 
-VerificationSummaryDict = TypedDict(
-    "VerificationSummaryDict",
-    {
-        "total_zero_shares_created": int,
-        "total_zero_shares_verified": int,
-        "invalid_shares_detected": dict[int, list[int]],
-        "participants_with_full_verification": int,
-        "potential_collusion_detected": bool,
-        "byzantine_parties_excluded": int,
-        "byzantine_party_ids": list[int],
-    },
-)
+class VerificationSummaryDict(TypedDict):
+    total_zero_shares_created: int
+    total_zero_shares_verified: int
+    invalid_shares_detected: dict[int, list[int]]
+    participants_with_full_verification: int
+    potential_collusion_detected: bool
+    byzantine_parties_excluded: int
+    byzantine_party_ids: list[int]
 
-VerificationDataDict = TypedDict(
-    "VerificationDataDict",
-    {
-        "original_shares_count": int,
-        "threshold": int,
-        "zero_commitment_count": int,
-        "timestamp": int,
-        "protocol": str,
-        "verification_method": str,
-        "hash_based": bool,
-        "verification_summary": VerificationSummaryDict,
-        "seed_fingerprint": str,
-        "verification_proofs": dict[int, dict[int, Any]],
-    },
-)
+class VerificationDataDict(TypedDict):
+    original_shares_count: int
+    threshold: int
+    zero_commitment_count: int
+    timestamp: int
+    protocol: str
+    verification_method: str
+    hash_based: bool
+    verification_summary: VerificationSummaryDict
+    seed_fingerprint: str
+    verification_proofs: dict[int, dict[int, Any]]
 
 # New TypedDict definitions for more complex return types
-MemoryUsageStatsDict = TypedDict(
-    "MemoryUsageStatsDict",
-    {
-        "current_bytes": int,
-        "current_mb": float,
-        "peak_bytes": int,
-        "peak_mb": float,
-        "max_mb": int,
-        "usage_percent": float,
-        "peak_percent": float,
-    },
-)
+class MemoryUsageStatsDict(TypedDict):
+    current_bytes: int
+    current_mb: float
+    peak_bytes: int
+    peak_mb: float
+    max_mb: int
+    usage_percent: float
+    peak_percent: float
 
-MemoryUsageStatsDict = TypedDict(
-    "MemoryUsageStatsDict",
-    {
-        "current_bytes": int,
-        "current_mb": float,
-        "peak_bytes": int,
-        "peak_mb": float,
-        "max_mb": int,
-        "usage_percent": float,
-        "peak_percent": float,
-    },
-)
+class ForensicDataDict(TypedDict):
+    message: str
+    severity: str
+    timestamp: int
+    error_type: str
+    detailed_info: Optional[str]
+    share_info: Optional[dict[str, Any]]
+    commitment_info: Optional[dict[str, Any]]
 
-ForensicDataDict = TypedDict(
-    "ForensicDataDict",
-    {
-        "message": str,
-        "severity": str,
-        "timestamp": int,
-        "error_type": str,
-        "detailed_info": Optional[str],
-        "share_info": Optional[dict[str, Any]],
-        "commitment_info": Optional[dict[str, Any]],
-    },
-)
+class ByzantineDetectionResultDict(TypedDict):
+    is_byzantine: bool
+    failure_count: int
+    total_shares: int
+    failure_rate: float
+    evidence: list[dict[str, Any]]
+    affected_participants: list[int]
+    timestamp: int
 
-ByzantineDetectionResultDict = TypedDict(
-    "ByzantineDetectionResultDict",
-    {
-        "is_byzantine": bool,
-        "failure_count": int,
-        "total_shares": int,
-        "failure_rate": float,
-        "evidence": list[dict[str, Any]],
-        "affected_participants": list[int],
-        "timestamp": int,
-    },
-)
+class DualCommitmentProofDict(TypedDict):
+    feldman_blinding_commitments: list[Union[tuple[FieldElement, FieldElement], FieldElement]]
+    pedersen_blinding_commitments: list[FieldElement]
+    challenge: int
+    responses: list[int]
+    response_randomizers: Optional[list[int]]
 
-DualCommitmentProofDict = TypedDict(
-    "DualCommitmentProofDict",
-    {
-        "feldman_blinding_commitments": list[
-            Union[tuple[FieldElement, FieldElement], FieldElement]
-        ],
-        "pedersen_blinding_commitments": list[FieldElement],
-        "challenge": int,
-        "responses": list[int],
-        "response_randomizers": Optional[list[int]],
-    },
-)
-
-IntegrationResultDict = TypedDict(
-    "IntegrationResultDict",
-    {
-        "feldman_commitments": str,
-        "pedersen_commitments": str,
-        "dual_proof": DualCommitmentProofDict,
-        "version": str,
-    },
-)
+class IntegrationResultDict(TypedDict):
+    feldman_commitments: str
+    pedersen_commitments: str
+    dual_proof: DualCommitmentProofDict
+    version: str
 
 # Type Aliases for Complex Types
 HashFunc = Callable[[bytes], Any]
@@ -435,33 +388,16 @@ RedundantExecutorFunc = Callable[..., Any]
 HashCommitment = tuple[FieldElement, Randomizer, Optional[bytes]]  # (hash, randomizer, entropy)
 CommitmentList = list[HashCommitment]  # List of commitments
 
-ProofDict = TypedDict(
-    "ProofDict",
-    {
-        "blinding_commitments": list[tuple[FieldElement, FieldElement]],
-        "challenge": FieldElement,
-        "responses": list[FieldElement],
-        "commitment_randomizers": list[FieldElement],
-        "blinding_randomizers": list[FieldElement],
-        "timestamp": int,
-    },
-)
+class ProofDict(TypedDict):
+    blinding_commitments: list[tuple[FieldElement, FieldElement]]
+    challenge: FieldElement
+    responses: list[FieldElement]
+    commitment_randomizers: list[FieldElement]
+    blinding_randomizers: list[FieldElement]
+    timestamp: int
 
 VerificationResult = tuple[bool, dict[int, bool]]
 RefreshingResult = tuple[ShareDict, CommitmentList, dict[str, Any]]
-
-ProofDict = TypedDict(
-    "ProofDict",
-    {
-        "blinding_commitments": list[tuple[FieldElement, FieldElement]],
-        "challenge": FieldElement,
-        "responses": list[FieldElement],
-        "commitment_randomizers": list[FieldElement],
-        "blinding_randomizers": list[FieldElement],
-        "timestamp": int,
-    },
-)
-
 
 # Custom warning for security issues
 class SecurityWarning(Warning):
@@ -575,8 +511,8 @@ class VerificationError(Exception):
         detailed_info: Optional[str] = None,
         severity: str = "critical",
         timestamp: Optional[int] = None,
-        share_info: Optional[Dict[str, Any]] = None,
-        commitment_info: Optional[Dict[str, Any]] = None,
+        share_info: Optional[dict[str, Any]] = None,
+        commitment_info: Optional[dict[str, Any]] = None,
     ):
         self.message = message
         self.detailed_info = detailed_info
@@ -591,7 +527,7 @@ class VerificationError(Exception):
 
     def get_forensic_data(
         self, detail_level: Literal["low", "medium", "high"] = "medium"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Return all forensic information as a dictionary for logging or analysis
 
@@ -610,9 +546,8 @@ class VerificationError(Exception):
         }
 
         # Add more details based on detail_level
-        if detail_level in ("medium", "high"):
-            if self.detailed_info:
-                result["detailed_info"] = self.detailed_info
+        if detail_level in ("medium", "high") and self.detailed_info:
+            result["detailed_info"] = self.detailed_info
 
         if detail_level == "high":
             if self.share_info:
@@ -640,9 +575,9 @@ class ParameterError(Exception):
         parameter_value: Optional[Any] = None,
         expected_type: Optional[str] = None,
     ):
-        self.message = message
+        self.message: str = message
         self.detailed_info = detailed_info
-        self.severity = severity
+        self.severity: str = severity
 
         # Validate timestamp
         if timestamp is not None and not isinstance(timestamp, int):
@@ -656,7 +591,7 @@ class ParameterError(Exception):
 
     def get_forensic_data(
         self, detail_level: Literal["low", "medium", "high"] = "medium"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Return all forensic information as a dictionary for logging or analysis
 
@@ -680,15 +615,14 @@ class ParameterError(Exception):
             result["parameter_name"] = self.parameter_name or ""
             result["expected_type"] = self.expected_type or ""
 
-        if detail_level == "high":
+        if detail_level == "high" and self.parameter_value is not None:
             # Convert parameter value to string at high detail level to ensure safe serialization
-            if self.parameter_value is not None:
-                if isinstance(self.parameter_value, int):
-                    result["parameter_value"] = self.parameter_value
-                elif isinstance(self.parameter_value, (str, bool, float)):
-                    result["parameter_value"] = str(self.parameter_value)
-                else:
-                    result["parameter_value"] = str(self.parameter_value)
+            if isinstance(self.parameter_value, int):
+                result["parameter_value"] = self.parameter_value
+            elif isinstance(self.parameter_value, (str, bool, float)):
+                result["parameter_value"] = str(self.parameter_value)
+            else:
+                result["parameter_value"] = str(self.parameter_value)
 
         return result
 
@@ -1186,27 +1120,26 @@ def check_memory_safety(
                     else gmpy2.mpz(modulus).bit_length()
                 )
                 result_bits: int = mod_bits
-            else:
-                # Estimate memory for non-modular exponentiation
-                # Handle both int and gmpy2.mpz exponents safely without conversion
-                if isinstance(exponent, (int, gmpy2.mpz)) and not isinstance(exponent, bool):
-                    # For very large exponents, use the exponent's bit length to estimate
-                    exp_bit_length: int = (
-                        exponent.bit_length()
-                        if hasattr(exponent, "bit_length")
-                        else gmpy2.mpz(exponent).bit_length()
-                    )
+            # Estimate memory for non-modular exponentiation
+            # Handle both int and gmpy2.mpz exponents safely without conversion
+            elif isinstance(exponent, (int, gmpy2.mpz)) and not isinstance(exponent, bool):
+                # For very large exponents, use the exponent's bit length to estimate
+                exp_bit_length: int = (
+                    exponent.bit_length()
+                    if hasattr(exponent, "bit_length")
+                    else gmpy2.mpz(exponent).bit_length()
+                )
 
-                    # If exponent is small enough, use direct multiplication
-                    if exp_bit_length < 20:  # Exponents up to ~1 million
-                        result_bits = base_bits * min(int(exponent), 1_000_000)
-                    else:
-                        # For larger exponents, use a logarithmic estimation
-                        # log2(base^exp) = exp * log2(base)
-                        result_bits = min(exp_bit_length * base_bits, base_bits * 1_000_000)
+                # If exponent is small enough, use direct multiplication
+                if exp_bit_length < 20:  # Exponents up to ~1 million
+                    result_bits = base_bits * min(int(exponent), 1_000_000)
                 else:
-                    # Default for non-numeric exponents
-                    result_bits = base_bits * 1000  # Very conservative
+                    # For larger exponents, use a logarithmic estimation
+                    # log2(base^exp) = exp * log2(base)
+                    result_bits = min(exp_bit_length * base_bits, base_bits * 1_000_000)
+            else:
+                # Default for non-numeric exponents
+                result_bits = base_bits * 1000  # Very conservative
 
             estimated_bytes: int = estimate_mpz_size(result_bits)
             return estimated_bytes <= max_bytes
@@ -1260,13 +1193,13 @@ def check_memory_safety(
         else:
             # Reject unknown operations if policy dictates
             if reject_unknown:
-                logger.warning(f"Rejecting unknown operation '{operation}' due to safety policy")
+                logger.warning("Rejecting unknown operation '{operation}' due to safety policy")
                 return False
 
             # Generic fallback for unknown operations with enhanced safety margins
             logger.warning(
-                f"Unknown operation '{operation}' in memory safety check. "
-                f"Using conservative estimation, but consider adding specific handling."
+                "Unknown operation '{operation}' in memory safety check. "
+                "Using conservative estimation, but consider adding specific handling."
             )
 
             # Estimate based on argument sizes with increased conservatism
@@ -1543,7 +1476,7 @@ def secure_redundant_execution(
     num_executions: int = 5
 
     # Create execution order list
-    execution_order: List[int] = list(range(num_executions))
+    execution_order: list[int] = list(range(num_executions))
 
     try:
         # Use cryptographically secure Fisher-Yates shuffle instead of random.shuffle
@@ -1555,11 +1488,11 @@ def secure_redundant_execution(
             execution_order[i], execution_order[j] = execution_order[j], execution_order[i]
     except Exception as e:
         # Fall back to deterministic if shuffle fails
-        logger.debug(f"Secure shuffle failed, using deterministic order: {str(e)}")
+        logger.debug(f"Secure shuffle failed, using deterministic order: {e!s}")
 
     # Execute function multiple times with randomized ordering
-    results: List[Any] = []
-    failures: List[Tuple[int, str]] = []
+    results: list[Any] = []
+    failures: list[tuple[int, str]] = []
 
     try:
         for idx in execution_order:
@@ -1567,7 +1500,7 @@ def secure_redundant_execution(
             try:
                 time.sleep(secrets.randbelow(10) / 1000)  # 0-9ms random delay
             except Exception as e:
-                logger.debug(f"Random delay failed, continuing without delay: {str(e)}")
+                logger.debug(f"Random delay failed, continuing without delay: {e!s}")
 
             try:
                 results.append(func(*args, **kwargs))
@@ -1581,7 +1514,7 @@ def secure_redundant_execution(
         if failures:
             failure_details: str = ", ".join([f"attempt {idx}: {err}" for idx, err in failures])
             detailed_message: str = (
-                f"Function {function_name} failed during redundant execution: " f"{failure_details}"
+                f"Function {function_name} failed during redundant execution: {failure_details}"
             )
             message: str = "Computation failed during security validation"
 
@@ -1599,7 +1532,7 @@ def secure_redundant_execution(
         if not all(result == results[0] for result in results):
             # Improved constant-time comparison for all permutations
             valid: bool = True
-            mismatch_details: List[str] = []
+            mismatch_details: list[str] = []
 
             for i in range(len(results)):
                 for j in range(i + 1, len(results)):  # Only check unique pairs
@@ -1672,7 +1605,7 @@ def secure_redundant_execution(
             raise  # Re-raise already processed security errors
 
         detailed_message: str = (
-            f"Unexpected error in secure redundant execution of {function_name}: {str(e)}"
+            f"Unexpected error in secure redundant execution of {function_name}: {e!s}"
         )
         message: str = "Security validation process failed"
         logger.error(detailed_message)
@@ -1885,7 +1818,7 @@ class MemoryMonitor:
 
         self.current_usage -= size_bytes
 
-    def get_usage_stats(self) -> Dict[str, Union[int, float]]:
+    def get_usage_stats(self) -> dict[str, Union[int, float]]:
         """
         Description:
             Get current memory usage statistics.
@@ -1949,23 +1882,21 @@ class CyclicGroup:
                     raise ParameterError("Provided value is not a prime")
                 if use_safe_prime and not CyclicGroup._is_safe_prime(self.prime):
                     raise ParameterError("Provided prime is not a safe prime")
+        # Use cached safe prime if available and requested
+        elif use_safe_prime and prime_bits in SAFE_PRIMES:
+            self.prime = gmpy2.mpz(SAFE_PRIMES[prime_bits])
+        # Generate a prime of appropriate size
+        # Note: For production, generating safe primes is very slow
+        # and should be done offline or use precomputed values
+        elif use_safe_prime:
+            warnings.warn(
+                "Generating a safe prime is computationally expensive. "
+                "Consider using precomputed safe primes for better performance.",
+                RuntimeWarning,
+            )
+            self.prime = self._generate_safe_prime(prime_bits)
         else:
-            # Use cached safe prime if available and requested
-            if use_safe_prime and prime_bits in SAFE_PRIMES:
-                self.prime = gmpy2.mpz(SAFE_PRIMES[prime_bits])
-            else:
-                # Generate a prime of appropriate size
-                # Note: For production, generating safe primes is very slow
-                # and should be done offline or use precomputed values
-                if use_safe_prime:
-                    warnings.warn(
-                        "Generating a safe prime is computationally expensive. "
-                        "Consider using precomputed safe primes for better performance.",
-                        RuntimeWarning,
-                    )
-                    self.prime = self._generate_safe_prime(prime_bits)
-                else:
-                    self.prime = self._generate_prime(prime_bits)
+            self.prime = self._generate_prime(prime_bits)
 
         # Set or find generator
         if generator is not None:
@@ -1981,7 +1912,7 @@ class CyclicGroup:
         # Pre-compute fixed-base exponentiations for common operations
         self._precompute_exponent_length: int = self.prime.bit_length()
         self._precompute_window_size: Optional[int] = _precompute_window_size
-        self._precomputed_powers: Dict[Union[int, str], Any] = self._precompute_powers()
+        self._precomputed_powers: dict[Union[int, str], Any] = self._precompute_powers()
 
     @staticmethod
     def _is_probable_prime(n: Union[int, "gmpy2.mpz"], k: int = 40) -> bool:
@@ -2182,14 +2113,14 @@ class CyclicGroup:
                 return g
 
         # Fallback to standard values that are often generators
-        standard_candidates: List[int] = [2, 3, 5, 7, 11, 13, 17]
+        standard_candidates: list[int] = [2, 3, 5, 7, 11, 13, 17]
         for g in standard_candidates:
             if g < self.prime and self._is_generator(g):
                 return gmpy2.mpz(g)
 
         raise RuntimeError("Failed to find a generator for the group")
 
-    def _precompute_powers(self) -> Dict[Union[int, str], Any]:
+    def _precompute_powers(self) -> dict[Union[int, str], Any]:
         """
         Description:
             Pre-compute powers of the generator for faster exponentiation with multi-level windows.
@@ -2209,25 +2140,24 @@ class CyclicGroup:
         small_window: int
         if self._precompute_window_size is not None:
             small_window = self._precompute_window_size
+        # Enhanced adaptive logic with better scaling
+        elif bits > 8192:
+            small_window = 8  # Conservative for very large primes
+        elif bits > 6144:
+            small_window = 7
+        elif bits > 4096:
+            small_window = 6
+        elif bits > 3072:
+            small_window = 5
         else:
-            # Enhanced adaptive logic with better scaling
-            if bits > 8192:
-                small_window = 8  # Conservative for very large primes
-            elif bits > 6144:
-                small_window = 7
-            elif bits > 4096:
-                small_window = 6
-            elif bits > 3072:
-                small_window = 5
-            else:
-                small_window = 4  # Minimum size for good performance
+            small_window = 4  # Minimum size for good performance
 
         # Large window remains at 8 for consistent big jumps
         large_window: int = 8
         large_step: int = 2**small_window
 
         # Rest of the method remains unchanged
-        precomputed: Dict[Union[int, str], Any] = {}
+        precomputed: dict[Union[int, str], Any] = {}
 
         # Small window exponents for fine-grained values
         j: int
@@ -2235,7 +2165,7 @@ class CyclicGroup:
             precomputed[j] = gmpy2.powmod(self.generator, j, self.prime)
 
         # Large window exponents for bigger jumps
-        large_exponents: Dict[int, "gmpy2.mpz"] = {}
+        large_exponents: dict[int, "gmpy2.mpz"] = {}
         k: int
         for k in range(1, 2 ** (large_window - small_window)):
             large_exponents[k] = gmpy2.powmod(self.generator, k * large_step, self.prime)
@@ -2292,7 +2222,7 @@ class CyclicGroup:
             )
 
         # Check cache for common operations
-        cache_key: Tuple["gmpy2.mpz", "gmpy2.mpz"] = (base_mpz, exponent_mpz)
+        cache_key: tuple["gmpy2.mpz", "gmpy2.mpz"] = (base_mpz, exponent_mpz)
 
         # Thread-safe cache access using SafeLRUCache methods
         result: Optional["gmpy2.mpz"] = self.cached_powers.get(cache_key)
@@ -2331,7 +2261,7 @@ class CyclicGroup:
         # Extract window parameters
         small_bits: int = self._precomputed_powers["small_bits"]
         large_step: int = self._precomputed_powers["large_step"]
-        large_window: Dict[int, "gmpy2.mpz"] = self._precomputed_powers.get("large_window", {})
+        large_window: dict[int, "gmpy2.mpz"] = self._precomputed_powers.get("large_window", {})
 
         result: "gmpy2.mpz" = gmpy2.mpz(1)
         remaining: "gmpy2.mpz" = exponent_mpz
@@ -2349,7 +2279,7 @@ class CyclicGroup:
             else:
                 # Take the largest available step
                 max_step: int = max(
-                    (k for k in large_window.keys() if k <= large_count_int), default=0
+                    (k for k in large_window if k <= large_count_int), default=0
                 )
                 if max_step > 0:
                     result = gmpy2.mul(result, large_window[max_step]) % self.prime
@@ -2575,7 +2505,7 @@ class CyclicGroup:
         return encoded
 
     def efficient_multi_exp(
-        self, bases: List[Union[int, "gmpy2.mpz"]], exponents: List[Union[int, "gmpy2.mpz"]]
+        self, bases: list[Union[int, "gmpy2.mpz"]], exponents: list[Union[int, "gmpy2.mpz"]]
     ) -> "gmpy2.mpz":
         """
         Description:
@@ -2603,11 +2533,11 @@ class CyclicGroup:
 
         # Normalize inputs
         prime: "gmpy2.mpz" = self.prime
-        bases_mpz: List["gmpy2.mpz"] = [gmpy2.mpz(b) % prime for b in bases]
+        bases_mpz: list["gmpy2.mpz"] = [gmpy2.mpz(b) % prime for b in bases]
 
         # Optimization: For safe primes p=2q+1, reduce modulo q instead of p-1
         q: "gmpy2.mpz" = (self.prime - 1) // 2
-        exponents_mpz: List["gmpy2.mpz"] = [gmpy2.mpz(e) % q for e in exponents]  # More efficient
+        exponents_mpz: list["gmpy2.mpz"] = [gmpy2.mpz(e) % q for e in exponents]  # More efficient
 
         # Estimate memory requirements
         max_base_bits: int = max(b.bit_length() for b in bases_mpz)
@@ -2631,7 +2561,7 @@ class CyclicGroup:
             window_size = max(1, window_size - 1)
 
         # Optimize precomputation strategy based on number of bases
-        precomp: Dict[int, "gmpy2.mpz"]
+        precomp: dict[int, "gmpy2.mpz"]
         if n <= 8:
             # For small n, precompute all possible combinations
             precomp = {}
@@ -2741,7 +2671,7 @@ class FeldmanVSS:
 
         self.field: Any = field
         self.config: VSSConfig = config or VSSConfig()  # Always post-quantum secure by default
-        self._byzantine_evidence: Dict[int, Dict[str, Any]] = {}
+        self._byzantine_evidence: dict[int, dict[str, Any]] = {}
 
         # Initialize the cyclic group for commitments
         if group is None:
@@ -2858,7 +2788,7 @@ class FeldmanVSS:
         byte_length: int = (prime_bit_length + 7) // 8
 
         # Prepare elements with proper byte encoding
-        elements: List[Any] = [
+        elements: list[Any] = [
             VSS_VERSION,  # Protocol version
             "COMMIT",  # Fixed domain separator
             context or "polynomial",  # Context with default
@@ -2929,7 +2859,7 @@ class FeldmanVSS:
         )
 
     def _compute_combined_randomizer(
-        self, randomizers: List[FieldElement], x: FieldElement
+        self, randomizers: list[FieldElement], x: FieldElement
     ) -> FieldElement:
         """
         Description:
@@ -2963,7 +2893,7 @@ class FeldmanVSS:
         return r_combined
 
     def _compute_expected_commitment(
-        self, commitments: List[Union[Tuple[FieldElement, ...], FieldElement]], x: FieldElement
+        self, commitments: list[Union[tuple[FieldElement, ...], FieldElement]], x: FieldElement
     ) -> FieldElement:
         """
         Description:
@@ -2983,7 +2913,7 @@ class FeldmanVSS:
         expected: "gmpy2.mpz" = gmpy2.mpz(0)
         x_power: "gmpy2.mpz" = gmpy2.mpz(1)
 
-        c_i: Union[Tuple[FieldElement, ...], FieldElement]
+        c_i: Union[tuple[FieldElement, ...], FieldElement]
         for c_i in commitments:
             # Extract commitment value from tuple if hash-based
             commitment_value: "gmpy2.mpz" = gmpy2.mpz(c_i[0] if isinstance(c_i, tuple) else c_i)
@@ -3037,7 +2967,7 @@ class FeldmanVSS:
             return False
 
     def create_commitments(
-        self, coefficients: List[FieldElement], context: Optional[str] = None
+        self, coefficients: list[FieldElement], context: Optional[str] = None
     ) -> CommitmentList:
         """
         Description:
@@ -3072,7 +3002,7 @@ class FeldmanVSS:
         return self.create_enhanced_commitments(coefficients, context)
 
     def create_enhanced_commitments(
-        self, coefficients: List[FieldElement], context: Optional[str] = None
+        self, coefficients: list[FieldElement], context: Optional[str] = None
     ) -> CommitmentList:
         """
         Description:
@@ -3104,7 +3034,7 @@ class FeldmanVSS:
             self._raise_sanitized_error(ParameterError, "Coefficients list cannot be empty")
 
         # Convert all coefficients to integers and reduce modulo field prime
-        coeffs_int: List["gmpy2.mpz"] = [
+        coeffs_int: list["gmpy2.mpz"] = [
             gmpy2.mpz(coeff) % self.field.prime for coeff in coefficients
         ]
 
@@ -3157,7 +3087,7 @@ class FeldmanVSS:
             bool: True if the share is valid, False otherwise.
         """
         # Extract randomizers from commitments
-        randomizers: List[FieldElement] = [r_i for _, r_i, _ in commitments]
+        randomizers: list[FieldElement] = [r_i for _, r_i, _ in commitments]
 
         # Compute combined randomizer
         r_combined: FieldElement = self._compute_combined_randomizer(randomizers, x)
@@ -3231,7 +3161,7 @@ class FeldmanVSS:
             return False
 
     def batch_verify_shares(
-        self, shares: List[SharePoint], commitments: CommitmentList
+        self, shares: list[SharePoint], commitments: CommitmentList
     ) -> VerificationResult:
         """
         Description:
@@ -3268,7 +3198,7 @@ class FeldmanVSS:
         if not all(isinstance(c, tuple) and len(c) >= 2 for c in commitments):
             raise TypeError("commitments must be a list of (commitment, randomizer) tuples")
 
-        results: Dict[int, bool] = {}
+        results: dict[int, bool] = {}
         all_valid: bool = True
 
         # Standard verification for small batches
@@ -3285,7 +3215,7 @@ class FeldmanVSS:
             return all_valid, results
 
         # Extract randomizers for more efficient processing
-        randomizers: List[FieldElement] = [r_i for _, r_i, _ in commitments]
+        randomizers: list[FieldElement] = [r_i for _, r_i, _ in commitments]
 
         # Extract extra_entropy if present (only for first coefficient)
         extra_entropy: Optional[bytes] = None
@@ -3294,10 +3224,10 @@ class FeldmanVSS:
 
         # For larger batches, use optimized verification approach with caching
         # Precompute powers of x for each share to avoid redundant calculations
-        x_powers_cache: Dict[FieldElement, List["gmpy2.mpz"]] = {}
+        x_powers_cache: dict[FieldElement, list["gmpy2.mpz"]] = {}
 
         # Prepare commitment combinations for each share
-        share_commitments: List[Tuple[FieldElement, FieldElement, FieldElement, FieldElement]] = []
+        share_commitments: list[tuple[FieldElement, FieldElement, FieldElement, FieldElement]] = []
 
         # First pass: compute and cache powers of x and prepare combined values
         x: FieldElement
@@ -3305,7 +3235,7 @@ class FeldmanVSS:
         for x, y in shares:
             if x not in x_powers_cache:
                 # Compute and cache powers of x
-                powers: List["gmpy2.mpz"] = [gmpy2.mpz(1)]  # x^0 = 1
+                powers: list["gmpy2.mpz"] = [gmpy2.mpz(1)]  # x^0 = 1
                 current_power: "gmpy2.mpz" = gmpy2.mpz(1)
                 j: int
                 for j in range(1, len(commitments)):
@@ -3325,7 +3255,7 @@ class FeldmanVSS:
         batch_start: int
         for batch_start in range(0, len(share_commitments), batch_size):
             batch_end: int = min(batch_start + batch_size, len(share_commitments))
-            batch: List[Tuple[FieldElement, FieldElement, FieldElement, FieldElement]] = (
+            batch: list[tuple[FieldElement, FieldElement, FieldElement, FieldElement]] = (
                 share_commitments[batch_start:batch_end]
             )
 
@@ -3376,12 +3306,12 @@ class FeldmanVSS:
             )
 
         # Extract commitment values
-        commitment_values: List[Tuple[int, int, Optional[str]]] = [
+        commitment_values: list[tuple[int, int, Optional[str]]] = [
             (int(c), int(r), e.hex() if e else None) for c, r, e in commitments
         ]
 
         # Create the data structure
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "version": VSS_VERSION,
             "timestamp": int(time.time()),
             "generator": int(self.generator),
@@ -3413,7 +3343,7 @@ class FeldmanVSS:
 
     def deserialize_commitments(
         self, data: str
-    ) -> Tuple[CommitmentList, FieldElement, FieldElement, int, bool]:
+    ) -> tuple[CommitmentList, FieldElement, FieldElement, int, bool]:
         """
         Description:
             Deserialize commitment data with checksum verification
@@ -3454,7 +3384,7 @@ class FeldmanVSS:
 
             try:
                 # Unpack the checksum wrapper
-                wrapper: Dict[bytes, Any] = unpacker.unpack()
+                wrapper: dict[bytes, Any] = unpacker.unpack()
             except (
                 msgpack.exceptions.ExtraData,
                 msgpack.exceptions.FormatError,
@@ -3495,7 +3425,7 @@ class FeldmanVSS:
 
             try:
                 # Proceed with unpacking the actual data
-                unpacked: Dict[bytes, Any] = inner_unpacker.unpack()
+                unpacked: dict[bytes, Any] = inner_unpacker.unpack()
             except (
                 msgpack.exceptions.ExtraData,
                 msgpack.exceptions.FormatError,
@@ -3542,7 +3472,7 @@ class FeldmanVSS:
 
             # Additional check for commitment structure
             i: int
-            commitment: Tuple[Any, ...]
+            commitment: tuple[Any, ...]
             for i, commitment in enumerate(unpacked.get(b"commitments", tuple())):
                 if not isinstance(commitment, tuple) or len(commitment) not in (2, 3):
                     detailed_msg = f"Invalid commitment format at index {i}: expected (commitment, randomizer) or (commitment, randomizer, extra_entropy) tuple"
@@ -3550,7 +3480,7 @@ class FeldmanVSS:
                     self._raise_sanitized_error(SerializationError, message, detailed_msg)
 
             # Extract the commitments and parameters
-            commitments: Tuple[Tuple[Any, ...], ...] = unpacked.get(b"commitments")
+            commitments: tuple[tuple[Any, ...], ...] = unpacked.get(b"commitments")
             generator: int = unpacked.get(b"generator")
             prime: int = unpacked.get(b"prime")
             timestamp: int = unpacked.get(b"timestamp", 0)
@@ -3592,7 +3522,7 @@ class FeldmanVSS:
 
             # Additional validation to verify all commitment values are in the proper range
             i: int
-            commitment_data: Tuple[Any, ...]
+            commitment_data: tuple[Any, ...]
             for i, commitment_data in enumerate(commitments):
                 if len(commitment_data) >= 2:
                     commitment_value: int = commitment_data[0]
@@ -3616,7 +3546,7 @@ class FeldmanVSS:
 
             # Reconstruct hash-based commitments
             reconstructed_commitments: CommitmentList = []
-            commitment_data: Tuple[Any, ...]
+            commitment_data: tuple[Any, ...]
             for commitment_data in commitments:
                 if len(commitment_data) >= 3 and commitment_data[2]:
                     # Has extra entropy - convert hex string back to bytes
@@ -3649,7 +3579,7 @@ class FeldmanVSS:
             if isinstance(e, (SerializationError, SecurityError)):
                 raise
 
-            detailed_msg = f"Exception during deserialization: {str(e)}"
+            detailed_msg = f"Exception during deserialization: {e!s}"
             message = "Failed to deserialize commitments"
             self._raise_sanitized_error(SerializationError, message, detailed_msg)
 
@@ -3707,7 +3637,7 @@ class FeldmanVSS:
             return temp_vss.verify_share(share_x, share_y, commitments)
 
         except Exception as e:
-            detailed_msg = f"Detailed verification failure for share ({share_x}, {share_y}): {str(e)}, Traceback: {traceback.format_exc()}"
+            detailed_msg = f"Detailed verification failure for share ({share_x}, {share_y}): {e!s}, Traceback: {traceback.format_exc()}"
             message = f"Failed to verify share: {e}"
             self._raise_sanitized_error(VerificationError, message, detailed_msg)
 
@@ -3755,7 +3685,7 @@ class FeldmanVSS:
         threshold: int,
         total_shares: int,
         original_commitments: Optional[CommitmentList] = None,
-        participant_ids: Optional[List[int]] = None,
+        participant_ids: Optional[list[int]] = None,
     ) -> RefreshingResult:
         """
         Description:
@@ -3825,7 +3755,7 @@ class FeldmanVSS:
         return self._refresh_shares_additive(shares, threshold, total_shares, participant_ids)
 
     def _refresh_shares_additive(
-        self, shares: ShareDict, threshold: int, total_shares: int, participant_ids: List[int]
+        self, shares: ShareDict, threshold: int, total_shares: int, participant_ids: list[int]
     ) -> RefreshingResult:
         """
         Description:
@@ -3854,16 +3784,16 @@ class FeldmanVSS:
             tuple: (new_shares, new_commitments, verification_data).
         """
         # Step 1: Each party creates a sharing of zero with enhanced verification
-        zero_sharings: Dict[int, ShareDict] = {}
-        zero_commitments: Dict[int, CommitmentList] = {}
+        zero_sharings: dict[int, ShareDict] = {}
+        zero_commitments: dict[int, CommitmentList] = {}
 
         # Use a deterministic seed derivation for each party to enable verification
         # while reducing communication requirements
-        verification_seeds: Dict[int, bytes] = {}
+        verification_seeds: dict[int, bytes] = {}
         master_seed: bytes = secrets.token_bytes(32)  # Generate master randomness
 
         # Initialize verification_proofs dictionary
-        verification_proofs: Dict[int, Dict[int, Any]] = {p_id: {} for p_id in participant_ids}
+        verification_proofs: dict[int, dict[int, Any]] = {p_id: {} for p_id in participant_ids}
 
         party_id: int
         for party_id in shares.keys():
@@ -3881,7 +3811,7 @@ class FeldmanVSS:
             party_rng = create_secure_deterministic_rng(party_seed)
 
             # Generate a random polynomial of degree t-1 with constant term 0
-            zero_coeffs: List[FieldElement] = [gmpy2.mpz(0)]  # First coefficient is 0
+            zero_coeffs: list[FieldElement] = [gmpy2.mpz(0)]  # First coefficient is 0
             _: int
             for _ in range(1, threshold):
                 # Use the seeded RNG for deterministic coefficient generation
@@ -3918,12 +3848,12 @@ class FeldmanVSS:
 
         # Step 2: Enhanced verification with improved Byzantine fault tolerance
         # Optimized for better performance and security
-        verified_zero_shares: Dict[int, Dict[int, FieldElement]] = {
+        verified_zero_shares: dict[int, dict[int, FieldElement]] = {
             p_id: {} for p_id in participant_ids
         }
-        invalid_shares_detected: Dict[int, List[int]] = {}
+        invalid_shares_detected: dict[int, list[int]] = {}
         new_shares: ShareDict = {}
-        byzantine_parties: Dict[int, Dict[str, Any]] = {}
+        byzantine_parties: dict[int, dict[str, Any]] = {}
 
         # Enhanced security parameters with dynamic adjustment
         security_factor: float = max(0.5, 1.0 - (threshold / (2 * len(shares))))
@@ -3931,14 +3861,14 @@ class FeldmanVSS:
 
         # Echo broadcast mechanism for consistency verification
         # This adds Byzantine fault tolerance following Chen & Lindell's recommendations
-        echo_consistency: Dict[Tuple[int, int], bool] = self._process_echo_consistency(
+        echo_consistency: dict[tuple[int, int], bool] = self._process_echo_consistency(
             zero_commitments, zero_sharings, participant_ids
         )
 
         # Identify Byzantine parties with adaptive quorum-based detection
         byzantine_parties = {}
         # Calculate consistency statistics per party
-        consistency_counts: Dict[int, Dict[str, int]] = {}
+        consistency_counts: dict[int, dict[str, int]] = {}
         for (party_id, _), is_consistent in echo_consistency.items():
             if party_id not in consistency_counts:
                 consistency_counts[party_id] = {
@@ -3963,12 +3893,12 @@ class FeldmanVSS:
         # Identify parties that failed to reach consistency quorum
 
         party_id: int
-        counts: Dict[str, int]
+        counts: dict[str, int]
         for party_id, counts in consistency_counts.items():
             if counts["total"] > 0:
                 consistency_ratio: float = counts["consistent"] / counts["total"]
                 if consistency_ratio < consistency_ratio_requirement:
-                    evidence: Dict[str, Union[str, float, int]] = {
+                    evidence: dict[str, Union[str, float, int]] = {
                         "type": "insufficient_consistency_quorum",
                         "consistency_ratio": consistency_ratio,
                         "required_ratio": consistency_ratio_requirement,
@@ -3991,7 +3921,7 @@ class FeldmanVSS:
                 continue  # Already identified as Byzantine
 
             is_byzantine: bool
-            evidence: Dict[str, Any]
+            evidence: dict[str, Any]
             is_byzantine, evidence = self._detect_byzantine_behavior(
                 party_id,
                 zero_commitments[party_id],
@@ -4010,19 +3940,19 @@ class FeldmanVSS:
         batch_size: int = self._calculate_optimal_batch_size(len(participant_ids), len(shares))
 
         # Group shares by commitment set for more efficient batch verification
-        verification_batches: List[List[Tuple[int, int, int, int, CommitmentList]]] = (
+        verification_batches: list[list[tuple[int, int, int, int, CommitmentList]]] = (
             self._prepare_verification_batches(
                 zero_sharings, zero_commitments, participant_ids, batch_size
             )
         )
 
         # Process verification with improved parallelism
-        verification_results: List[Tuple[Tuple[int, int], bool]] = (
+        verification_results: list[tuple[tuple[int, int], bool]] = (
             self._process_verification_batches(verification_batches)
         )
 
         # Process verification results with Byzantine exclusion
-        result: Tuple[Tuple[int, int], bool]
+        result: tuple[tuple[int, int], bool]
         for (party_id, p_id), is_valid in verification_results:
             # Skip shares from Byzantine parties
             if party_id in byzantine_parties:
@@ -4055,7 +3985,7 @@ class FeldmanVSS:
                 )
 
         # Improved collusion detection with network analysis algorithms
-        potential_collusion: List[int] = self._enhanced_collusion_detection(
+        potential_collusion: list[int] = self._enhanced_collusion_detection(
             invalid_shares_detected, shares.keys(), echo_consistency
         )
         p_id: int
@@ -4076,7 +4006,7 @@ class FeldmanVSS:
             # Enhanced security check with detailed diagnostics
             if verified_count < required_threshold:
                 security_ratio: float = verified_count / threshold
-                diagnostics: Dict[str, Union[int, float, List[int]]] = {
+                diagnostics: dict[str, Union[int, float, list[int]]] = {
                     "verified_count": verified_count,
                     "threshold": threshold,
                     "required_threshold": required_threshold,
@@ -4136,12 +4066,12 @@ class FeldmanVSS:
 
         # Step 3: Calculate the new commitments
         # Extract x and y values from a subset of new shares for efficient reconstruction
-        sample_shares: List[SharePoint] = list(new_shares.values())[:threshold]
-        x_values: List[FieldElement] = [share[0] for share in sample_shares]
-        y_values: List[FieldElement] = [share[1] for share in sample_shares]
+        sample_shares: list[SharePoint] = list(new_shares.values())[:threshold]
+        x_values: list[FieldElement] = [share[0] for share in sample_shares]
+        y_values: list[FieldElement] = [share[1] for share in sample_shares]
 
         # Reconstruct the new polynomial coefficients via optimized interpolation
-        new_coeffs: List[FieldElement] = self._reconstruct_polynomial_coefficients(
+        new_coeffs: list[FieldElement] = self._reconstruct_polynomial_coefficients(
             x_values, y_values, threshold
         )
 
@@ -4167,7 +4097,7 @@ class FeldmanVSS:
         return new_shares, new_commitments, verification_data
 
     def _secure_sum_shares(
-        self, shares_dict: Dict[int, FieldElement], modulus: FieldElement
+        self, shares_dict: dict[int, FieldElement], modulus: FieldElement
     ) -> FieldElement:
         """
         Description:
@@ -4224,7 +4154,7 @@ class FeldmanVSS:
         base_threshold: int,
         verified_count: int,
         total_parties: int,
-        invalid_parties: List[int],
+        invalid_parties: list[int],
     ) -> int:
         """
         Description:
@@ -4271,8 +4201,8 @@ class FeldmanVSS:
         return min(required, total_parties)
 
     def _detect_collusion_patterns(
-        self, invalid_shares_detected: Dict[int, List[int]], party_ids: Set[int]
-    ) -> List[int]:
+        self, invalid_shares_detected: dict[int, list[int]], party_ids: set[int]
+    ) -> list[int]:
         """
         Description:
             Detect potential collusion patterns among parties that provided invalid shares.
@@ -4292,7 +4222,7 @@ class FeldmanVSS:
             return []
 
         # Count how many times each party provided invalid shares
-        invalid_count: Dict[int, int] = {}
+        invalid_count: dict[int, int] = {}
 
         for parties in invalid_shares_detected.values():
             for party_id in parties:
@@ -4300,19 +4230,19 @@ class FeldmanVSS:
 
         # Calculate a suspicious threshold - parties that have more than 30% invalid shares
         suspicious_threshold: float = 0.3 * len(invalid_shares_detected)
-        suspicious_parties: List[int] = [
+        suspicious_parties: list[int] = [
             party for party, count in invalid_count.items() if count > suspicious_threshold
         ]
 
         # Check for patterns indicating potential collusion
-        potential_colluders: List[int] = []
+        potential_colluders: list[int] = []
 
         # If multiple suspicious parties targeted the same participants, they might be colluding
         if len(suspicious_parties) > 1:
             # Check for overlap in targeted participants
-            targeted_participants: Dict[int, Set[int]] = {}
+            targeted_participants: dict[int, set[int]] = {}
             participant_id: int
-            parties: List[int]
+            parties: list[int]
             for participant_id, parties in invalid_shares_detected.items():
                 party_id: int
                 for party_id in parties:
@@ -4327,8 +4257,8 @@ class FeldmanVSS:
             for p1 in suspicious_parties:
                 for p2 in suspicious_parties:
                     if p1 < p2 and p1 in targeted_participants and p2 in targeted_participants:
-                        p1_targets: Set[int] = targeted_participants[p1]
-                        p2_targets: Set[int] = targeted_participants[p2]
+                        p1_targets: set[int] = targeted_participants[p1]
+                        p2_targets: set[int] = targeted_participants[p2]
                         overlap: int = len(p1_targets.intersection(p2_targets))
                         union: int = len(p1_targets.union(p2_targets))
 
@@ -4343,7 +4273,7 @@ class FeldmanVSS:
 
     def _create_invalidity_proof(
         self, party_id: int, participant_id: int, share: SharePoint, commitments: CommitmentList
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Description:
             Create a cryptographic proof that a share is invalid.
@@ -4368,7 +4298,7 @@ class FeldmanVSS:
         x, y = share
 
         # Extract randomizers from commitments for hash-based verification
-        randomizers: List[FieldElement] = [r_i for _, r_i, _ in commitments]
+        randomizers: list[FieldElement] = [r_i for _, r_i, _ in commitments]
 
         # Compute the combined randomizer for this point
         r_combined: FieldElement = self._compute_combined_randomizer(randomizers, x)
@@ -4417,8 +4347,8 @@ class FeldmanVSS:
         original_y: FieldElement,
         sum_zero_shares: FieldElement,
         new_y: FieldElement,
-        verified_shares: Dict[int, FieldElement],
-    ) -> Dict[str, Any]:
+        verified_shares: dict[int, FieldElement],
+    ) -> dict[str, Any]:
         """
         Description:
             Generate a proof that the share refreshing was done correctly.
@@ -4477,10 +4407,10 @@ class FeldmanVSS:
 
     def _process_echo_consistency(
         self,
-        zero_commitments: Dict[int, CommitmentList],
-        zero_sharings: Dict[int, ShareDict],
-        participant_ids: List[int],
-    ) -> Dict[Tuple[int, int], bool]:
+        zero_commitments: dict[int, CommitmentList],
+        zero_sharings: dict[int, ShareDict],
+        participant_ids: list[int],
+    ) -> dict[tuple[int, int], bool]:
         """
         Description:
             Enhanced echo consistency protocol for Byzantine fault detection.
@@ -4551,14 +4481,14 @@ class FeldmanVSS:
                 self._raise_sanitized_error(TypeError, message_str, detailed_msg)
 
         # Initialize result storage
-        consistency_results: Dict[Tuple[int, int], bool] = {}
+        consistency_results: dict[tuple[int, int], bool] = {}
         # Placeholder for consistency computation results to avoid timing leaks
-        consistency_data: List[Tuple[Tuple[int, int], Tuple[int, int], bool]] = []
+        consistency_data: list[tuple[tuple[int, int], tuple[int, int], bool]] = []
         # Byzantine evidence with improved structure
-        byzantine_evidence: Dict[int, Dict[str, Any]] = {}
+        byzantine_evidence: dict[int, dict[str, Any]] = {}
 
         # Create cryptographically secure fingerprints of each sharing
-        share_fingerprints: Dict[int, Dict[int, bytes]] = {}
+        share_fingerprints: dict[int, dict[int, bytes]] = {}
 
         sending_party_id: int
         party_shares: ShareDict
@@ -4582,7 +4512,7 @@ class FeldmanVSS:
                     share_fingerprints[sending_party_id][recipient_id] = fingerprint
 
         # Echo broadcast phase: participants share what they received
-        echo_broadcasts: Dict[int, Dict[int, Tuple[SharePoint, bytes]]] = {}
+        echo_broadcasts: dict[int, dict[int, tuple[SharePoint, bytes]]] = {}
         recipient_id: int
         for recipient_id in participant_ids:
             echo_broadcasts[recipient_id] = {}
@@ -4806,8 +4736,8 @@ class FeldmanVSS:
         # with the ability to quickly identify problematic shares
         cpu_count: int = 1
         try:
-            import multiprocessing
             import math
+            import multiprocessing
 
             cpu_count = max(1, multiprocessing.cpu_count())
 
@@ -4856,11 +4786,11 @@ class FeldmanVSS:
 
     def _prepare_verification_batches(
         self,
-        zero_sharings: Dict[int, ShareDict],
-        zero_commitments: Dict[int, CommitmentList],
-        participant_ids: List[int],
+        zero_sharings: dict[int, ShareDict],
+        zero_commitments: dict[int, CommitmentList],
+        participant_ids: list[int],
         batch_size: int,
-    ) -> List[List[Tuple[int, int, FieldElement, FieldElement, CommitmentList]]]:
+    ) -> list[list[tuple[int, int, FieldElement, FieldElement, CommitmentList]]]:
         """
         Description:
             Prepare efficient verification batches grouped by commitment set.
@@ -4880,13 +4810,13 @@ class FeldmanVSS:
         Outputs:
             list: List of verification batches.
         """
-        verification_batches: List[
-            List[Tuple[int, int, FieldElement, FieldElement, CommitmentList]]
+        verification_batches: list[
+            list[tuple[int, int, FieldElement, FieldElement, CommitmentList]]
         ] = []
 
         # Group shares by commitment set for efficient batch verification
-        commitment_groups: Dict[
-            str, Tuple[CommitmentList, List[Tuple[int, int, FieldElement, FieldElement]]]
+        commitment_groups: dict[
+            str, tuple[CommitmentList, list[tuple[int, int, FieldElement, FieldElement]]]
         ] = {}
 
         party_id: int
@@ -4926,12 +4856,12 @@ class FeldmanVSS:
 
         commitment_key: str
         commitments: CommitmentList
-        items: List[Tuple[int, int, FieldElement, FieldElement]]
+        items: list[tuple[int, int, FieldElement, FieldElement]]
         for commitment_key, (commitments, items) in commitment_groups.items():
             i: int
             for i in range(0, len(items), batch_size):
-                batch: List[Tuple[int, int, FieldElement, FieldElement]] = items[i : i + batch_size]
-                batch_items: List[Tuple[int, int, FieldElement, FieldElement, CommitmentList]] = [
+                batch: list[tuple[int, int, FieldElement, FieldElement]] = items[i : i + batch_size]
+                batch_items: list[tuple[int, int, FieldElement, FieldElement, CommitmentList]] = [
                     (party_id, p_id, x, y, commitments) for party_id, p_id, x, y in batch
                 ]
                 verification_batches.append(batch_items)
@@ -4940,10 +4870,10 @@ class FeldmanVSS:
 
     def _process_verification_batches(
         self,
-        verification_batches: List[
-            List[Tuple[int, int, FieldElement, FieldElement, CommitmentList]]
+        verification_batches: list[
+            list[tuple[int, int, FieldElement, FieldElement, CommitmentList]]
         ],
-    ) -> List[Tuple[Tuple[int, int], bool]]:
+    ) -> list[tuple[tuple[int, int], bool]]:
         """
         Description:
             Process verification batches with optimized parallelism.
@@ -4959,10 +4889,10 @@ class FeldmanVSS:
         """
 
         def verify_batch(
-            batch_items: List[Tuple[int, int, FieldElement, FieldElement, CommitmentList]],
-        ) -> List[Tuple[Tuple[int, int], bool]]:
-            results: Dict[int, Tuple[int, int]] = {}
-            batch_shares: List[SharePoint] = []
+            batch_items: list[tuple[int, int, FieldElement, FieldElement, CommitmentList]],
+        ) -> list[tuple[tuple[int, int], bool]]:
+            results: dict[int, tuple[int, int]] = {}
+            batch_shares: list[SharePoint] = []
 
             idx: int
             party_id: int
@@ -4975,7 +4905,7 @@ class FeldmanVSS:
                 results[idx] = (party_id, p_id)
 
             # Use batch verification when possible
-            verification_results: Dict[int, bool]
+            verification_results: dict[int, bool]
             _: bool
             if len(batch_shares) > 1:
                 _, verification_results = self.batch_verify_shares(batch_shares, commitments)
@@ -4988,23 +4918,23 @@ class FeldmanVSS:
                 ]
 
         # Try parallel verification with improved error handling
-        verification_results: List[Tuple[Tuple[int, int], bool]] = []
+        verification_results: list[tuple[tuple[int, int], bool]] = []
         try:
             import concurrent.futures
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 # Use a more robust approach for gathering results
-                future_to_batch: Dict[
-                    "concurrent.futures.Future[List[Tuple[Tuple[int, int], bool]]]", int
+                future_to_batch: dict[
+                    "concurrent.futures.Future[list[tuple[tuple[int, int], bool]]]", int
                 ] = {
                     executor.submit(verify_batch, batch): i
                     for i, batch in enumerate(verification_batches)
                 }
 
-                future: "concurrent.futures.Future[List[Tuple[Tuple[int, int], bool]]]"
+                future: "concurrent.futures.Future[list[tuple[tuple[int, int], bool]]]"
                 for future in concurrent.futures.as_completed(future_to_batch):
                     try:
-                        batch_results: List[Tuple[Tuple[int, int], bool]] = future.result()
+                        batch_results: list[tuple[tuple[int, int], bool]] = future.result()
                         verification_results.extend(batch_results)
                     except Exception as e:
                         warnings.warn(f"Error in verification batch: {e}", RuntimeWarning)
@@ -5029,21 +4959,19 @@ class FeldmanVSS:
 
                             # Log the detailed error for forensic analysis
                             if logging:
-                                try:
-                                    logging.error(f"{fail_msg} Original error: {e}")
-                                except (ImportError, NameError):
-                                    pass  # If logging is not available, continue silently
+                                with contextlib.suppress(ImportError, NameError):
+                                    logging.exception("Batch verification failure detected", extra={"fail_msg": fail_msg})
         except (ImportError, RuntimeError):
             # Fallback to sequential verification with progress tracking
 
-            batch: List[Tuple[int, int, FieldElement, FieldElement, CommitmentList]]
+            batch: list[tuple[int, int, FieldElement, FieldElement, CommitmentList]]
             for batch in verification_batches:
                 verification_results.extend(verify_batch(batch))
 
         return verification_results
 
     def _get_share_value_from_results(
-        self, party_id: int, p_id: int, zero_sharings: Dict[int, ShareDict]
+        self, party_id: int, p_id: int, zero_sharings: dict[int, ShareDict]
     ) -> Optional[FieldElement]:
         """
         Description:
@@ -5071,9 +4999,9 @@ class FeldmanVSS:
         self,
         party_id: int,
         p_id: int,
-        zero_sharings: Dict[int, ShareDict],
-        zero_commitments: Dict[int, CommitmentList],
-        verification_proofs: Dict[int, Dict[int, Any]],
+        zero_sharings: dict[int, ShareDict],
+        zero_commitments: dict[int, CommitmentList],
+        verification_proofs: dict[int, dict[int, Any]],
         share_verification: bool,
         echo_consistency: bool,
     ) -> None:
@@ -5113,7 +5041,7 @@ class FeldmanVSS:
 
                 if commitments:
                     # Create comprehensive proof with additional evidence
-                    proof: Dict[str, Any] = self._create_invalidity_proof(
+                    proof: dict[str, Any] = self._create_invalidity_proof(
                         party_id, p_id, share, commitments
                     )
 
@@ -5135,10 +5063,10 @@ class FeldmanVSS:
 
     def _enhanced_collusion_detection(
         self,
-        invalid_shares_detected: Dict[int, List[int]],
-        party_ids: Set[int],
-        echo_consistency: Dict[Tuple[int, int], bool],
-    ) -> List[int]:
+        invalid_shares_detected: dict[int, list[int]],
+        party_ids: set[int],
+        echo_consistency: dict[tuple[int, int], bool],
+    ) -> list[int]:
         """
         Description:
             Enhanced collusion detection with improved graph analysis.
@@ -5160,9 +5088,9 @@ class FeldmanVSS:
             return []
 
         # Count how many times each party provided invalid shares
-        invalid_count: Dict[int, int] = {}
+        invalid_count: dict[int, int] = {}
 
-        parties: List[int]
+        parties: list[int]
         for parties in invalid_shares_detected.values():
             party_id: int
             for party_id in parties:
@@ -5173,13 +5101,13 @@ class FeldmanVSS:
         suspicious_threshold: float = max(1, 0.25 * total_participants)
 
         # Identify suspicious parties with high invalid share counts
-        suspicious_parties: List[int] = [
+        suspicious_parties: list[int] = [
             party for party, count in invalid_count.items() if count > suspicious_threshold
         ]
 
         # Enhanced detection: look for patterns in echo consistency failures
         if echo_consistency:
-            inconsistent_parties: Set[int] = set()
+            inconsistent_parties: set[int] = set()
 
             party_id: int
             is_consistent: bool
@@ -5194,18 +5122,18 @@ class FeldmanVSS:
                     suspicious_parties.append(party)
 
         # Identify potential collusion patterns
-        potential_colluders: List[int] = []
+        potential_colluders: list[int] = []
 
         # Check for targeting patterns (multiple suspicious parties targeting the same participants)
         if len(suspicious_parties) > 1:
-            targeted_participants: Dict[int, Set[int]] = {}
+            targeted_participants: dict[int, set[int]] = {}
 
             party_id: int
             for party_id in suspicious_parties:
                 targeted_participants[party_id] = set()
 
                 p_id: int
-                parties: List[int]
+                parties: list[int]
                 for p_id, parties in invalid_shares_detected.items():
                     if party_id in parties:
                         targeted_participants[party_id].add(p_id)
@@ -5218,8 +5146,8 @@ class FeldmanVSS:
                 p2: int
                 for p2 in suspicious_parties[i + 1 :]:
                     if p1 in targeted_participants and p2 in targeted_participants:
-                        p1_targets: Set[int] = targeted_participants[p1]
-                        p2_targets: Set[int] = targeted_participants[p2]
+                        p1_targets: set[int] = targeted_participants[p1]
+                        p2_targets: set[int] = targeted_participants[p2]
 
                         # Calculate Jaccard similarity of target sets
                         if p1_targets and p2_targets:
@@ -5236,7 +5164,7 @@ class FeldmanVSS:
         return potential_colluders
 
     def create_polynomial_proof(
-        self, coefficients: List[FieldElement], commitments: CommitmentList
+        self, coefficients: list[FieldElement], commitments: CommitmentList
     ) -> ProofDict:
         """
         Description:
@@ -5276,17 +5204,17 @@ class FeldmanVSS:
             )
 
         # Convert coefficients to integers for consistent arithmetic
-        coeffs_int: List[FieldElement] = [
+        coeffs_int: list[FieldElement] = [
             gmpy2.mpz(coeff) % self.field.prime for coeff in coefficients
         ]
 
         # Generate secure random blinding factors
-        blindings: List[FieldElement] = [
+        blindings: list[FieldElement] = [
             self.group.secure_random_element() for _ in range(len(coeffs_int))
         ]
 
         # Create hash-based commitments to blinding factors with domain separation
-        blinding_commitments: List[Tuple[FieldElement, FieldElement]] = []
+        blinding_commitments: list[tuple[FieldElement, FieldElement]] = []
         i: int
         b: FieldElement
         for i, b in enumerate(blindings):
@@ -5322,12 +5250,12 @@ class FeldmanVSS:
         challenge: FieldElement = int.from_bytes(challenge_hash, "big") % self.field.prime
 
         # Compute responses using sensitive coefficients - this should be constant-time
-        responses: List[FieldElement] = [
+        responses: list[FieldElement] = [
             (b + challenge * a) % self.field.prime for b, a in zip(blindings, coeffs_int)
         ]
 
         # Safely extract commitment randomizers regardless of tuple length
-        commitment_randomizers: List[FieldElement] = []
+        commitment_randomizers: list[FieldElement] = []
         for c in commitments:
             if len(c) >= 2:
                 commitment_randomizers.append(c[1])
@@ -5420,7 +5348,7 @@ class FeldmanVSS:
             if isinstance(e, SecurityError):
                 raise  # Re-raise SecurityError without modification
 
-            detailed_msg = f"Proof verification failed: {str(e)}"
+            detailed_msg = f"Proof verification failed: {e!s}"
             message = "Proof verification failed"
             self._raise_sanitized_error(VerificationError, message, detailed_msg)
             return False  # This line is unreachable but included for completeness
@@ -5441,7 +5369,7 @@ class FeldmanVSS:
             commitment_randomizers = proof["commitment_randomizers"]
             blinding_randomizers = proof["blinding_randomizers"]
         except (KeyError, TypeError) as e:
-            detailed_msg = f"Incomplete or malformed proof structure: {str(e)}"
+            detailed_msg = f"Incomplete or malformed proof structure: {e!s}"
             message = "Invalid proof structure"
             self._raise_sanitized_error(ValueError, message, detailed_msg)
 
@@ -5536,7 +5464,7 @@ class FeldmanVSS:
             gc.collect()
         except Exception as e:
             # Log the error instead of silently passing
-            logging.debug(f"Non-critical error during cleanup: {str(e)}")
+            logging.debug(f"Non-critical error during cleanup: {e!s}")
 
         return all_valid
 
@@ -5570,7 +5498,7 @@ class FeldmanVSS:
 
         # Extract required components from proof
         try:
-            blinding_commitments: List[Tuple[int | mpz]] = proof["blinding_commitments"]
+            blinding_commitments: list[tuple[int | mpz]] = proof["blinding_commitments"]
             challenge = proof["challenge"]
             timestamp = proof.get("timestamp", int(time.time()))
         except KeyError as e:
@@ -5583,10 +5511,10 @@ class FeldmanVSS:
 
         # Safe extraction of commitment values with proper error handling
         try:
-            commitment_values: List[int | mpz] = [
+            commitment_values: list[int | mpz] = [
                 c[0] if isinstance(c, tuple) and len(c) > 0 else 0 for c in commitments
             ]
-            blinding_commitment_values: List[int | mpz] = [
+            blinding_commitment_values: list[int | mpz] = [
                 bc[0] if isinstance(bc, tuple) and len(bc) > 0 else 0 for bc in blinding_commitments
             ]
         except (TypeError, IndexError) as e:
@@ -5627,8 +5555,8 @@ class FeldmanVSS:
         party_id: int,
         commitments: CommitmentList,
         shares: ShareDict,
-        consistency_results: Optional[Dict[Tuple[int, int], bool]] = None,
-    ) -> Tuple[bool, Dict[str, Any]]:
+        consistency_results: Optional[dict[tuple[int, int], bool]] = None,
+    ) -> tuple[bool, dict[str, Any]]:
         """
         Description:
             Enhanced Byzantine fault detection for comprehensive security analysis.
@@ -5654,7 +5582,7 @@ class FeldmanVSS:
         Raises:
             TypeError: If inputs have incorrect types.
         """
-        evidence: Dict[str, Any] = {}
+        evidence: dict[str, Any] = {}
         is_byzantine: bool = False
 
         # Input validation
@@ -5698,7 +5626,7 @@ class FeldmanVSS:
             is_byzantine = True
 
         # Check 2: Are all shares consistent with the commitments?
-        share_consistency: Dict[int, bool] = {}
+        share_consistency: dict[int, bool] = {}
 
         recipient_id: int
         x: FieldElement
@@ -5713,7 +5641,7 @@ class FeldmanVSS:
                     evidence["inconsistent_shares"] = {}
 
                 # Compute values needed for verification for better diagnostics
-                randomizers: List[FieldElement] = [r_i for _, r_i, _ in commitments]
+                randomizers: list[FieldElement] = [r_i for _, r_i, _ in commitments]
                 r_combined: FieldElement = self._compute_combined_randomizer(randomizers, x)
                 expected_commitment: FieldElement = self._compute_expected_commitment(
                     commitments, x
@@ -5753,8 +5681,8 @@ class FeldmanVSS:
         party_id: int,
         commitments: CommitmentList,
         shares: ShareDict,
-        consistency_results: Optional[Dict[Tuple[int, int], bool]] = None,
-    ) -> Tuple[bool, Dict[str, Any]]:
+        consistency_results: Optional[dict[tuple[int, int], bool]] = None,
+    ) -> tuple[bool, dict[str, Any]]:
         """
         Description:
             Public method to detect Byzantine behavior from a specific party.
@@ -5792,7 +5720,7 @@ class FeldmanVSS:
 
         return self._detect_byzantine_behavior(party_id, commitments, shares, consistency_results)
 
-    def _evaluate_polynomial(self, coefficients: List[FieldElement], x: int) -> FieldElement:
+    def _evaluate_polynomial(self, coefficients: list[FieldElement], x: int) -> FieldElement:
         """
         Description:
             Evaluate polynomial at point x using constant-time Horner's method.
@@ -5827,8 +5755,8 @@ class FeldmanVSS:
         return result
 
     def _reconstruct_polynomial_coefficients(
-        self, x_values: List[FieldElement], y_values: List[FieldElement], threshold: int
-    ) -> List[FieldElement]:
+        self, x_values: list[FieldElement], y_values: list[FieldElement], threshold: int
+    ) -> list[FieldElement]:
         """
         Description:
             Reconstruct polynomial coefficients using quantum-resistant interpolation.
@@ -5885,10 +5813,10 @@ class FeldmanVSS:
 
         # For threshold > 1, use matrix-based approach
         # Create Vandermonde matrix for the system of equations
-        matrix: List[List[FieldElement]] = []
+        matrix: list[list[FieldElement]] = []
         x: FieldElement
         for x in x_values:
-            row: List[FieldElement] = []
+            row: list[FieldElement] = []
             j: int
             for j in range(threshold):
                 row.append(gmpy2.powmod(x, j, prime))
@@ -5899,10 +5827,10 @@ class FeldmanVSS:
 
     def _secure_matrix_solve(
         self,
-        matrix: List[List[FieldElement]],
-        vector: List[FieldElement],
+        matrix: list[list[FieldElement]],
+        vector: list[FieldElement],
         prime: Optional[FieldElement] = None,
-    ) -> List[FieldElement]:
+    ) -> list[FieldElement]:
         """
         Description:
         Solve a linear system using side-channel resistant Gaussian elimination.
@@ -5925,12 +5853,11 @@ class FeldmanVSS:
         """
         if prime is None:
             prime = self.field.prime
-        else:
-            # Validate that prime is actually prime when provided externally
-            if not gmpy2.is_prime(gmpy2.mpz(prime)):
-                detailed_msg = f"The provided value {prime} is not a prime number"
-                message = "Invalid prime parameter"
-                self._raise_sanitized_error(ValueError, message, detailed_msg)
+        # Validate that prime is actually prime when provided externally
+        elif not gmpy2.is_prime(gmpy2.mpz(prime)):
+            detailed_msg = f"The provided value {prime} is not a prime number"
+            message = "Invalid prime parameter"
+            self._raise_sanitized_error(ValueError, message, detailed_msg)
 
         n: int = len(vector)
 
@@ -5957,7 +5884,7 @@ class FeldmanVSS:
         # Estimate memory requirements for the matrix operations
         max_element: int = 0
 
-        row: List[FieldElement]
+        row: list[FieldElement]
         for row in matrix:
             element: FieldElement
             for element in row:
@@ -5973,8 +5900,8 @@ class FeldmanVSS:
             )
 
         # Convert to gmpy2 types
-        matrix_mpz: List[List["gmpy2.mpz"]] = [[gmpy2.mpz(x) for x in row] for row in matrix]
-        vector_mpz: List["gmpy2.mpz"] = [gmpy2.mpz(x) for x in vector]
+        matrix_mpz: list[list["gmpy2.mpz"]] = [[gmpy2.mpz(x) for x in row] for row in matrix]
+        vector_mpz: list["gmpy2.mpz"] = [gmpy2.mpz(x) for x in vector]
 
         # Forward elimination with side-channel resistant operations
         i: int
@@ -6036,7 +5963,7 @@ class FeldmanVSS:
         return vector_mpz
 
     def _find_secure_pivot(
-        self, matrix: List[List["gmpy2.mpz"]], col: int, n: int
+        self, matrix: list[list["gmpy2.mpz"]], col: int, n: int
     ) -> Optional[int]:
         """
         Description:
@@ -6115,8 +6042,8 @@ class FeldmanVSS:
         return pivot_row
 
     def create_commitments_with_proof(
-        self, coefficients: List[FieldElement], context: Optional[str] = None
-    ) -> Tuple[CommitmentList, ProofDict]:
+        self, coefficients: list[FieldElement], context: Optional[str] = None
+    ) -> tuple[CommitmentList, ProofDict]:
         """
         Description:
             Create commitments to polynomial coefficients and generate a zero-knowledge
@@ -6194,7 +6121,7 @@ class FeldmanVSS:
             )
 
         # Validate proof has all required keys before proceeding
-        required_keys: List[str] = [
+        required_keys: list[str] = [
             "blinding_commitments",
             "challenge",
             "responses",
@@ -6252,7 +6179,7 @@ class FeldmanVSS:
         if not isinstance(proof, dict):
             raise TypeError("proof must be a dictionary")
 
-        required_proof_keys: List[str] = [
+        required_proof_keys: list[str] = [
             "blinding_commitments",
             "challenge",
             "responses",
@@ -6272,12 +6199,12 @@ class FeldmanVSS:
             )
 
         # First serialize the commitments as before
-        commitment_values: List[Tuple[int, int, Optional[str]]] = [
+        commitment_values: list[tuple[int, int, Optional[str]]] = [
             (int(c), int(r), e.hex() if e else None) for c, r, e in commitments
         ]
 
         # Process proof data for serialization
-        serializable_proof: Dict[str, Any] = {
+        serializable_proof: dict[str, Any] = {
             "blinding_commitments": [(int(c), int(r)) for c, r in proof["blinding_commitments"]],
             "challenge": int(proof["challenge"]),
             "responses": [int(r) for r in proof["responses"]],
@@ -6286,7 +6213,7 @@ class FeldmanVSS:
             "timestamp": int(proof["timestamp"]),
         }
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "version": VSS_VERSION,
             "timestamp": int(time.time()),
             "generator": int(self.generator),
@@ -6302,7 +6229,7 @@ class FeldmanVSS:
             packed_data: bytes = msgpack.packb(result)
 
             # Compute checksum and create wrapper
-            checksum_wrapper: Dict[str, Any] = {
+            checksum_wrapper: dict[str, Any] = {
                 "data": packed_data,
                 "checksum": compute_checksum(packed_data),
             }
@@ -6318,7 +6245,7 @@ class FeldmanVSS:
 
     def deserialize_commitments_with_proof(
         self, data: str
-    ) -> Tuple[CommitmentList, ProofDict, FieldElement, FieldElement, int]:
+    ) -> tuple[CommitmentList, ProofDict, FieldElement, FieldElement, int]:
         """
         Description:
             Deserialize commitment data including zero-knowledge proof with enhanced security checks
@@ -6370,7 +6297,7 @@ class FeldmanVSS:
             BLINDING_RANDOMIZERS_KEY = b"blinding_randomizers"
             TIMESTAMP_KEY = b"timestamp"
 
-            wrapper_dict: Dict[bytes, Any]
+            wrapper_dict: dict[bytes, Any]
             try:
                 # Unpack the checksum wrapper
                 wrapper_dict = unpacker.unpack()
@@ -6413,7 +6340,7 @@ class FeldmanVSS:
             )
             inner_unpacker.feed(packed_data)
 
-            unpacked_dict: Dict[bytes, Any]
+            unpacked_dict: dict[bytes, Any]
             try:
                 # Proceed with unpacking the actual data
                 unpacked_dict = inner_unpacker.unpack()
@@ -6447,14 +6374,14 @@ class FeldmanVSS:
                 self._raise_sanitized_error(SerializationError, message, detailed_msg)
 
             # Extract and reconstruct proof
-            serialized_proof: Optional[Dict[bytes, Any]] = unpacked_dict.get(PROOF_KEY)
+            serialized_proof: Optional[dict[bytes, Any]] = unpacked_dict.get(PROOF_KEY)
             if not serialized_proof:
                 detailed_msg = "Missing proof data in serialized commitments"
                 message = "Missing proof data"
                 self._raise_sanitized_error(SerializationError, message, detailed_msg)
 
             # Validate proof structure more thoroughly
-            required_keys: List[bytes] = [
+            required_keys: list[bytes] = [
                 BLINDING_COMMITMENTS_KEY,
                 CHALLENGE_KEY,
                 RESPONSES_KEY,
@@ -6534,7 +6461,7 @@ class FeldmanVSS:
 
     def verify_share_with_proof(
         self, share_x: FieldElement, share_y: FieldElement, serialized_data: str
-    ) -> Tuple[bool, bool]:
+    ) -> tuple[bool, bool]:
         """
         Description:
             Comprehensive verification of a share against serialized commitment data with proof
@@ -6624,7 +6551,7 @@ def get_feldman_vss(field: Any, **kwargs: Any) -> FeldmanVSS:
     if not isinstance(field.prime, (int, gmpy2.mpz)):
         raise TypeError("field.prime must be an integer type")
 
-    config: Optional[VSSConfig] = kwargs.get("config", None)
+    config: Optional[VSSConfig] = kwargs.get("config")
 
     if config is None:
         config = VSSConfig(
@@ -6681,8 +6608,8 @@ def create_vss_from_shamir(shamir_instance: Any) -> FeldmanVSS:
 
 # Add a helper function to integrate with Pedersen VSS
 def integrate_with_pedersen(
-    feldman_vss: FeldmanVSS, pedersen_vss: Any, shares: ShareDict, coefficients: List[FieldElement]
-) -> Dict[str, Any]:
+    feldman_vss: FeldmanVSS, pedersen_vss: Any, shares: ShareDict, coefficients: list[FieldElement]
+) -> dict[str, Any]:
     """
     Description:
         Integrate Feldman VSS with Pedersen VSS for dual verification.
@@ -6722,11 +6649,11 @@ def integrate_with_pedersen(
     feldman_commitments: CommitmentList = feldman_vss.create_commitments(coefficients)
 
     # Generate Pedersen commitments
-    pedersen_commitments: List[FieldElement] = pedersen_vss.create_commitments(coefficients)
+    pedersen_commitments: list[FieldElement] = pedersen_vss.create_commitments(coefficients)
 
     # Create a zero-knowledge proof that both commitment sets commit to the same values
     # This demonstrates that the Feldman and Pedersen schemes are using the same polynomial
-    proof: Dict[str, Any] = create_dual_commitment_proof(
+    proof: dict[str, Any] = create_dual_commitment_proof(
         feldman_vss,
         pedersen_vss,
         coefficients,
@@ -6749,10 +6676,10 @@ def integrate_with_pedersen(
 def create_dual_commitment_proof(
     feldman_vss: FeldmanVSS,
     pedersen_vss: Any,
-    coefficients: List[FieldElement],
+    coefficients: list[FieldElement],
     feldman_commitments: CommitmentList,
-    pedersen_commitments: List[FieldElement],
-) -> Dict[str, Any]:
+    pedersen_commitments: list[FieldElement],
+) -> dict[str, Any]:
     """
     Description:
         Create a zero-knowledge proof that Feldman and Pedersen commitments
@@ -6806,7 +6733,7 @@ def create_dual_commitment_proof(
         )
 
     # Generate random blinding factors
-    blindings: List[FieldElement] = [
+    blindings: list[FieldElement] = [
         feldman_vss.group.secure_random_element() for _ in range(len(coefficients))
     ]
 
@@ -6814,7 +6741,7 @@ def create_dual_commitment_proof(
     is_hash_based: bool = isinstance(feldman_commitments[0], tuple)
 
     # Create Feldman commitments to the blinding factors
-    feldman_blinding_commitments: List[Union[Tuple[FieldElement, FieldElement], FieldElement]] = []
+    feldman_blinding_commitments: list[Union[tuple[FieldElement, FieldElement], FieldElement]] = []
 
     if is_hash_based:
         # Create hash-based blinding commitments (with randomizers)
@@ -6836,7 +6763,7 @@ def create_dual_commitment_proof(
         ]
 
     # Create Pedersen commitments to the blinding factors
-    pedersen_blinding_commitments: List[FieldElement] = pedersen_vss.commit_to_blinding_factors(
+    pedersen_blinding_commitments: list[FieldElement] = pedersen_vss.commit_to_blinding_factors(
         blindings
     )
 
@@ -6861,12 +6788,12 @@ def create_dual_commitment_proof(
     challenge: FieldElement = int.from_bytes(challenge_hash, "big") % feldman_vss.field.prime
 
     # Compute responses
-    responses: List[FieldElement] = [
+    responses: list[FieldElement] = [
         (b + challenge * c) % feldman_vss.field.prime for b, c in zip(blindings, coefficients)
     ]
 
     # For hash-based commitments, include combined randomizers for verification
-    response_randomizers: Optional[List[FieldElement]] = None
+    response_randomizers: Optional[list[FieldElement]] = None
     if is_hash_based:
         response_randomizers = []
         i: int
@@ -6878,7 +6805,7 @@ def create_dual_commitment_proof(
             response_randomizers.append(r_combined)
 
     # Return the proof structure
-    proof: Dict[str, Any] = {
+    proof: dict[str, Any] = {
         "feldman_blinding_commitments": feldman_blinding_commitments,
         "pedersen_blinding_commitments": pedersen_blinding_commitments,
         "challenge": int(challenge),
@@ -6896,8 +6823,8 @@ def verify_dual_commitments(
     feldman_vss: FeldmanVSS,
     pedersen_vss: Any,
     feldman_commitments: CommitmentList,
-    pedersen_commitments: List[FieldElement],
-    proof: Dict[str, Any],
+    pedersen_commitments: list[FieldElement],
+    proof: dict[str, Any],
 ) -> bool:
     """
     Description:
@@ -6931,7 +6858,7 @@ def verify_dual_commitments(
         raise ValueError("feldman_commitments and pedersen_commitments must have the same length")
 
     # Required proof components
-    required_keys: List[str] = [
+    required_keys: list[str] = [
         "feldman_blinding_commitments",
         "pedersen_blinding_commitments",
         "challenge",
@@ -6949,13 +6876,13 @@ def verify_dual_commitments(
         raise ValueError("Number of pedersen_blinding_commitments must match number of commitments")
 
     # Extract proof components
-    feldman_blinding_commitments: List[Union[Tuple[FieldElement, FieldElement], FieldElement]] = (
+    feldman_blinding_commitments: list[Union[tuple[FieldElement, FieldElement], FieldElement]] = (
         proof["feldman_blinding_commitments"]
     )
-    pedersen_blinding_commitments: List[FieldElement] = proof["pedersen_blinding_commitments"]
+    pedersen_blinding_commitments: list[FieldElement] = proof["pedersen_blinding_commitments"]
     challenge: FieldElement = proof["challenge"]
-    responses: List[FieldElement] = proof["responses"]
-    response_randomizers: Optional[List[FieldElement]] = proof.get("response_randomizers", None)
+    responses: list[FieldElement] = proof["responses"]
+    response_randomizers: Optional[list[FieldElement]] = proof.get("response_randomizers")
 
     # Check if we're using hash-based commitments for Feldman VSS
     is_hash_based: bool = isinstance(feldman_commitments[0], tuple)
@@ -7043,3 +6970,4 @@ def verify_dual_commitments(
             all_valid &= constant_time_compare(left_side, right_side)
 
     return all_valid
+
