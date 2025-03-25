@@ -18,9 +18,49 @@ jobs:
           fetch-depth: 0
 
       - name: Wait for SonarQube analysis to complete
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          PROJECT_KEY: DavidOsipov_PostQuantum-Feldman-VSS
+          GITHUB_SHA: ${{ github.sha }}
         run: |
-          # Give time for any in-progress analysis to complete
-          sleep 60
+          echo "Waiting for SonarQube analysis to complete for commit: $GITHUB_SHA"
+          
+          MAX_ATTEMPTS=30  # 30 attempts × 30 seconds = 15 minutes maximum wait time
+          ATTEMPT=1
+          
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS: Checking for completed analysis..."
+            
+            ANALYSIS_RESPONSE=$(curl --silent --fail --show-error \
+              --header "Authorization: Bearer ${SONAR_TOKEN}" \
+              "${SONAR_HOST_URL}/api/ce/analysis_history?projectKey=${PROJECT_KEY}")
+            
+            # Check if request was successful
+            if [ $? -ne 0 ]; then
+              echo "Failed to query SonarQube API for analysis history"
+              sleep 30
+              ATTEMPT=$((ATTEMPT+1))
+              continue
+            fi
+            
+            # Find analysis ID for the current commit SHA with status SUCCESS
+            ANALYSIS_ID=$(echo $ANALYSIS_RESPONSE | jq -r '.analyses[] | select(.scmRevision == "'${GITHUB_SHA}'" and .status == "SUCCESS") | .id')
+            
+            if [ -n "$ANALYSIS_ID" ]; then
+              echo "✅ Found successful analysis for commit ${GITHUB_SHA}"
+              echo "Analysis ID: $ANALYSIS_ID"
+              exit 0
+            fi
+            
+            echo "Analysis not yet complete. Waiting 30 seconds before next check..."
+            sleep 30
+            ATTEMPT=$((ATTEMPT+1))
+          done
+          
+          echo "::error::Timed out waiting for SonarQube analysis to complete after $(($MAX_ATTEMPTS * 30)) seconds"
+          echo "::error::Please ensure the SonarQube analysis is configured correctly."
+          exit 1
 
       - name: Check SonarQube Quality Gate
         env:
@@ -29,26 +69,16 @@ jobs:
           PROJECT_KEY: DavidOsipov_PostQuantum-Feldman-VSS
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          # First, get analysis ID for this commit
-          echo "Checking SonarQube analysis for commit: $GITHUB_SHA"
-          
+          # Get analysis ID for this commit
           ANALYSIS_RESPONSE=$(curl --silent --fail --show-error \
             --header "Authorization: Bearer ${SONAR_TOKEN}" \
             "${SONAR_HOST_URL}/api/ce/analysis_history?projectKey=${PROJECT_KEY}")
-          
-          # Check if request was successful
-          if [ $? -ne 0 ]; then
-            echo "Failed to query SonarQube API for analysis history"
-            exit 1
-          fi
           
           # Find analysis ID for the current commit SHA with status SUCCESS
           ANALYSIS_ID=$(echo $ANALYSIS_RESPONSE | jq -r '.analyses[] | select(.scmRevision == "'${GITHUB_SHA}'" and .status == "SUCCESS") | .id')
           
           if [ -z "$ANALYSIS_ID" ]; then
-            echo "No successful analysis found for commit ${GITHUB_SHA}"
-            echo "::error::This tag must be created on a commit that has been analyzed by SonarQube."
-            echo "::error::Please ensure the commit has been pushed to the main branch first to trigger analysis."
+            echo "::error::No successful analysis found for commit ${GITHUB_SHA}"
             exit 1
           fi
           
@@ -58,12 +88,6 @@ jobs:
           QUALITY_GATE_RESPONSE=$(curl --silent --fail --show-error \
             --header "Authorization: Bearer ${SONAR_TOKEN}" \
             "${SONAR_HOST_URL}/api/qualitygates/project_status?analysisId=${ANALYSIS_ID}")
-          
-          # Check if request was successful
-          if [ $? -ne 0 ]; then
-            echo "Failed to query SonarQube API for quality gate status"
-            exit 1
-          fi
           
           # Extract and check quality gate status
           STATUS=$(echo $QUALITY_GATE_RESPONSE | jq -r '.projectStatus.status')

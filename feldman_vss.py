@@ -4539,7 +4539,7 @@ class FeldmanVSS:
         party_id: int
         commitments: CommitmentList
         for party_id, commitments in zero_commitments.items():
-             if not isinstance(commitments, list) or not commitments:
+            if not isinstance(commitments, list) or not commitments:
                 detailed_msg = (
                     f"Invalid commitment format for party {party_id}: expected non-empty list"
                 )
