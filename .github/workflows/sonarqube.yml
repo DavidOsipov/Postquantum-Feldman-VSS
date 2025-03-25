@@ -1,3 +1,23 @@
+# This workflow integrates multiple Python security and quality analysis tools with SonarQube.
+# It runs various static code analysis tools and security scanners in parallel, then aggregates
+# their results into SonarQube for unified reporting.
+#
+# Tools included:
+# - Bandit: Security-focused static analyser
+# - Ruff: Fast Python linter
+# - MyPy: Static type checker
+# - Flake8: Style guide enforcer
+# - Pylint: Static code analyser
+# - CodeQL: Semantic code analysis
+# - Snyk: Dependency and security scanner
+#
+# Known Limitations:
+# - SonarQube currently doesn't support Pyright report format natively
+# - SBOM (Software Bill of Materials) imports are currently not supported in SonarQube Cloud
+# - SonarCube Cloud doesn't allow downloading SaRIF reports. If we find a way to do this, we can uploaded them to CodeQL.
+#
+# The workflow runs weekly and on all PR/push events to main branch.
+
 name: 🛡️ Bastion Quality Gates
 
 
@@ -24,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        tool: [bandit, ruff, mypy, flake8, pylint, codeql, snyk, pyright]
+        tool: [bandit, ruff, mypy, flake8, pylint, codeql, snyk]
     steps:
       - name: Checkout code
         uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
@@ -96,10 +116,6 @@ jobs:
               poetry run pip install pylint
               poetry run pylint --version
               ;;
-            pyright)
-              poetry run pip install pyright
-              poetry run pyright --version
-              ;;
             *)
               echo "Unknown tool: ${{ matrix.tool }}"
               exit 1
@@ -144,10 +160,6 @@ jobs:
       - name: Run Pylint
         if: matrix.tool == 'pylint'
         run: poetry run pylint --recursive=y . --output-format=json > pylint_report.json || true
-
-      - name: Run Pyright
-        if: matrix.tool == 'pyright'
-        run: poetry run pyright --outputjson > pyright_report.json || true
 
       - name: Initialize CodeQL
         if: matrix.tool == 'codeql'
@@ -270,11 +282,6 @@ jobs:
             
           if [ -n "$sarif_reports" ]; then
             sonar_args="${sonar_args} -Dsonar.sarifReportPaths=${sarif_reports}"
-          fi
-            
-          safe_move_report "reports/pyright-report" "pyright_report.json" "processed_reports/pyright_report.json"
-          if [ $? -eq 0 ]; then
-            sonar_args="${sonar_args} -Dsonar.externalIssuesReportPaths=processed_reports/pyright_report.json"
           fi
             
           # Store SonarQube args in environment variable for next step
