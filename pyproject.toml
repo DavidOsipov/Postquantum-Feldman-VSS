@@ -125,3 +125,72 @@ target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
 max-line-length = 100
 extend-ignore = ["E203", "W503", "E501"]
 per-file-ignores = ["__init__.py:F401"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "examples", ".venv"]
+skips = ["B311"]  # Skip B311 as it warns against random, but your code uses secrets module properly
+
+[tool.bandit.assert_used]
+skips = ["*/test_*.py"]  # Allow asserts in test files
+
+[tool.bandit.tests]
+# Cryptography-related
+B324 = true  # hashlib usage checks
+B505 = true  # weak_cryptographic_key
+B103 = true  # set_bad_file_permissions
+B303 = true  # Use of insecure MD2, MD4, MD5, or SHA1 hash functions
+B501 = true  # request_with_no_cert_validation
+B502 = true  # ssl_with_bad_version
+B504 = true  # ssl_with_no_version
+B506 = true  # yaml_load
+B608 = true  # hardcoded_sql_expressions
+
+# General security practices
+B101 = true  # assert_used in non-test code
+B110 = true  # try_except_pass
+B112 = true  # try_except_continue
+B613 = true  # trojansource (unicode-based vulnerabilities)
+B703 = true  # django_mark_safe
+B704 = true  # markupsafe_markup_xss
+
+# High severity issues 
+B602 = true  # subprocess_popen_with_shell_equals_true
+B605 = true  # start_process_with_a_shell
+B611 = true  # django_rawsql_used
+
+# Deserialization security
+B301 = true  # pickle and similar modules (unsafe deserialization)
+B302 = true  # marshal (unsafe deserialization)
+
+# Cryptographic weaknesses
+B304 = true  # insecure ciphers
+B305 = true  # insecure cipher modes (ECB)
+
+# Code injection risks
+B307 = true  # eval usage
+B310 = true  # URL opening with potentially unsafe schemes
+
+# Network security
+B312 = true  # telnetlib usage (insecure protocol)
+B321 = true  # ftplib usage (insecure protocol)
+B323 = true  # SSL unverified context
+
+# XML security
+B313 = true  # xml.etree.cElementTree (XXE vulnerabilities)
+B314 = true  # xml.etree.ElementTree (XXE vulnerabilities)
+B315 = true  # xml.sax.expatreader (XXE vulnerabilities)
+B316 = true  # xml.dom.expatbuilder (XXE vulnerabilities)
+B317 = true  # xml.sax (XXE vulnerabilities)
+B318 = true  # xml.dom.minidom (XXE vulnerabilities)
+B319 = true  # xml.dom.pulldom (XXE vulnerabilities)
+
+[tool.bandit.high_severity_level]
+severity = "high"
+
+[tool.bandit.medium_severity_level]
+# Enable most important medium severity issues
+severity = "medium"
+
+[tool.bandit.log_level]
+# Set log level to filter out warnings
+level = "info"
