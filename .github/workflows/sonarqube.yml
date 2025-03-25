@@ -340,11 +340,6 @@ jobs:
             sonar_args="${sonar_args} -Dsonar.python.mypy.reportPaths=processed_reports/mypy_report.txt"
           fi
             
-          safe_move_report "reports/flake8-report" "flake8_report.txt" "processed_reports/flake8_report.txt"
-          if [ $? -eq 0 ]; then
-            sonar_args="${sonar_args} -Dsonar.python.flake8.reportPaths=processed_reports/flake8_report.txt"
-          fi
-            
           safe_move_report "reports/pylint-report" "pylint_report.json" "processed_reports/pylint_report.json"
           if [ $? -eq 0 ]; then
             sonar_args="${sonar_args} -Dsonar.python.pylint.reportPaths=processed_reports/pylint_report.json"
