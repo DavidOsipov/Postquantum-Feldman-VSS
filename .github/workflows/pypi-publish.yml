@@ -1,4 +1,3 @@
-# .github/workflows/pypi-publish.yml
 name: Publish Python 🐍 distributions 📦 to PyPI and TestPyPI
 
 on:
@@ -9,8 +8,78 @@ on:
   workflow_dispatch:
 
 jobs:
+  check-quality-gate:
+    name: Check SonarQube Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+        with:
+          fetch-depth: 0
+
+      - name: Wait for SonarQube analysis to complete
+        run: |
+          # Give time for any in-progress analysis to complete
+          sleep 60
+
+      - name: Check SonarQube Quality Gate
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          PROJECT_KEY: DavidOsipov_PostQuantum-Feldman-VSS
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          # First, get analysis ID for this commit
+          echo "Checking SonarQube analysis for commit: $GITHUB_SHA"
+          
+          ANALYSIS_RESPONSE=$(curl --silent --fail --show-error \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            "${SONAR_HOST_URL}/api/ce/analysis_history?projectKey=${PROJECT_KEY}")
+          
+          # Check if request was successful
+          if [ $? -ne 0 ]; then
+            echo "Failed to query SonarQube API for analysis history"
+            exit 1
+          fi
+          
+          # Find analysis ID for the current commit SHA with status SUCCESS
+          ANALYSIS_ID=$(echo $ANALYSIS_RESPONSE | jq -r '.analyses[] | select(.scmRevision == "'${GITHUB_SHA}'" and .status == "SUCCESS") | .id')
+          
+          if [ -z "$ANALYSIS_ID" ]; then
+            echo "No successful analysis found for commit ${GITHUB_SHA}"
+            echo "::error::This tag must be created on a commit that has been analyzed by SonarQube."
+            echo "::error::Please ensure the commit has been pushed to the main branch first to trigger analysis."
+            exit 1
+          fi
+          
+          echo "Found analysis ID: $ANALYSIS_ID"
+          
+          # Get quality gate status using the analysis ID
+          QUALITY_GATE_RESPONSE=$(curl --silent --fail --show-error \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            "${SONAR_HOST_URL}/api/qualitygates/project_status?analysisId=${ANALYSIS_ID}")
+          
+          # Check if request was successful
+          if [ $? -ne 0 ]; then
+            echo "Failed to query SonarQube API for quality gate status"
+            exit 1
+          fi
+          
+          # Extract and check quality gate status
+          STATUS=$(echo $QUALITY_GATE_RESPONSE | jq -r '.projectStatus.status')
+          echo "Quality Gate Status: $STATUS"
+          
+          if [ "$STATUS" != "OK" ]; then
+            echo "::error::Quality Gate check failed with status: $STATUS"
+            echo "::error::Please check SonarQube analysis at ${SONAR_HOST_URL}/dashboard?id=${PROJECT_KEY}"
+            exit 1
+          fi
+          
+          echo "✅ Quality Gate passed successfully"
+
   build-n-publish:
     name: pypi-publish
+    needs: check-quality-gate
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -18,10 +87,10 @@ jobs:
       id-token: write
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55
       with:
         python-version: "3.13"
 
