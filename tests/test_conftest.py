@@ -1,4 +1,4 @@
-# tests/conftest.py
+# tests/test_conftest.py
 # Shared fixtures, helper functions, and configuration for the Postquantum Feldman VSS test suite
 # This file is part of the Postquantum Feldman VSS library.
 import logging
