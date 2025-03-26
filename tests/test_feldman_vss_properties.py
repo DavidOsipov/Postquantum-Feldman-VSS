@@ -26,7 +26,7 @@ from feldman_vss import (
     VerificationError,
 )
 
-from .conftest import (
+from .test_conftest import (
     TEST_PRIME_BITS_FAST,
     MockField,
     MockShamirSecretSharing,
@@ -40,22 +40,22 @@ from .conftest import (
 settings.register_profile(
     "ci",
     max_examples=200,
-    deadline=None, # No deadline for CI
+    deadline=None,  # No deadline for CI
     verbosity=Verbosity.normal,
-    phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink]
+    phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
 )
 settings.register_profile(
     "dev",
     max_examples=50,
-    deadline=2000, # 2 seconds deadline for dev
-    verbosity=Verbosity.verbose
+    deadline=2000,  # 2 seconds deadline for dev
+    verbosity=Verbosity.verbose,
 )
 settings.register_profile(
     "deep",
     max_examples=1000,
     deadline=None,
     verbosity=Verbosity.normal,
-    phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink]
+    phases=[Phase.explicit, Phase.reuse, Phase.generate, Phase.target, Phase.shrink],
 )
 
 # Load the desired profile (e.g., 'dev' for local runs, 'ci' for CI)
@@ -64,7 +64,8 @@ settings.load_profile("dev")
 
 # --- Test Class ---
 
-@pytest.mark.properties # Custom marker for property-based tests
+
+@pytest.mark.properties  # Custom marker for property-based tests
 class TestPropertyBased:
     """Property-based tests using Hypothesis for robustness."""
 
@@ -73,7 +74,7 @@ class TestPropertyBased:
     # Note: Strategies themselves can't directly use fixtures. We pass prime in the test method.
 
     # Strategy for threshold t (ensure t >= 2)
-    threshold_strategy = st.integers(min_value=2, max_value=10) # Keep max small for speed
+    threshold_strategy = st.integers(min_value=2, max_value=10)  # Keep max small for speed
 
     @staticmethod
     @st.composite
@@ -81,10 +82,10 @@ class TestPropertyBased:
         """Composite strategy to generate consistent coefficients and shares."""
         t = draw(TestPropertyBased.threshold_strategy)
         # Ensure n >= t
-        n = draw(st.integers(min_value=t, max_value=15)) # Keep max small
+        n = draw(st.integers(min_value=t, max_value=15))  # Keep max small
         secret = draw(st.integers(min_value=0, max_value=int(field.prime) - 1))
         # Generate coefficients using the field's random element method
-        coeffs = [mpz(secret)] + [field.random_element() for _ in range(t-1)]
+        coeffs = [mpz(secret)] + [field.random_element() for _ in range(t - 1)]
         shares: ShareDict = {}
         for i in range(1, n + 1):
             x = mpz(i)
@@ -95,13 +96,13 @@ class TestPropertyBased:
     # --- Tests ---
 
     @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.data_too_large])
-    @given(st.data()) # Use st.data() to allow drawing based on fixtures
+    @given(st.data())  # Use st.data() to allow drawing based on fixtures
     def test_prop_verify_valid_shares(self, default_vss: FeldmanVSS, mock_field_fast: MockField, data):
         """Property: Correctly generated shares should always verify."""
         coeffs, shares, t, n = data.draw(self.coeffs_and_shares_strategy(mock_field_fast))
 
-        assume(coeffs) # Skip if coeffs list is empty (shouldn't happen with t>=2)
-        assume(shares) # Skip if shares dict is empty
+        assume(coeffs)  # Skip if coeffs list is empty (shouldn't happen with t>=2)
+        assume(shares)  # Skip if shares dict is empty
 
         try:
             commitments = default_vss.create_commitments(coeffs)
@@ -109,14 +110,13 @@ class TestPropertyBased:
                 x, y = shares[share_id]
                 assert default_vss.verify_share(x, y, commitments) is True, f"Valid share ({x},{y}) failed verification"
         except (ParameterError, ValueError, SecurityError, MemoryError) as e:
-             test_logger.debug(f"Hypothesis verify valid share caught expected error: {e}")
-             # Allow expected errors during generation/verification with edge cases
+            test_logger.debug(f"Hypothesis verify valid share caught expected error: {e}")
+            # Allow expected errors during generation/verification with edge cases
         except Exception as e:
-             pytest.fail(f"Unexpected exception during valid share verification: {e}")
+            pytest.fail(f"Unexpected exception during valid share verification: {e}")
 
     @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.data_too_large])
-    @given(st.data(),
-           tamper_amount=st.integers(min_value=1)) # Tamper by at least 1
+    @given(st.data(), tamper_amount=st.integers(min_value=1))  # Tamper by at least 1
     def test_prop_verify_invalid_shares(self, default_vss: FeldmanVSS, mock_field_fast: MockField, data, tamper_amount):
         """Property: Tampered shares should always fail verification."""
         coeffs, shares, t, n = data.draw(self.coeffs_and_shares_strategy(mock_field_fast))
@@ -131,80 +131,85 @@ class TestPropertyBased:
 
             # Tamper the y value, ensuring it's different
             invalid_y = (y + tamper_amount) % mock_field_fast.prime
-            assume(invalid_y != y) # Ensure tampering actually changed the value
+            assume(invalid_y != y)  # Ensure tampering actually changed the value
 
             assert default_vss.verify_share(x, invalid_y, commitments) is False, f"Invalid share ({x},{invalid_y}) passed verification"
 
             # Also test tampering x value (less common but should fail)
-            invalid_x = x + 1 # Simple tamper
-            assert default_vss.verify_share(invalid_x, y, commitments) is False, f"Share with invalid x ({invalid_x},{y}) passed verification"
+            invalid_x = x + 1  # Simple tamper
+            assert default_vss.verify_share(invalid_x, y, commitments) is False, (
+                f"Share with invalid x ({invalid_x},{y}) passed verification"
+            )
 
         except (ParameterError, ValueError, SecurityError, MemoryError) as e:
-             test_logger.debug(f"Hypothesis verify invalid share caught expected error: {e}")
+            test_logger.debug(f"Hypothesis verify invalid share caught expected error: {e}")
         except Exception as e:
-             pytest.fail(f"Unexpected exception during invalid share verification: {e}")
+            pytest.fail(f"Unexpected exception during invalid share verification: {e}")
 
     @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.data_too_large])
     @given(st.data())
     def test_prop_zkp_roundtrip(self, default_vss: FeldmanVSS, mock_field_fast: MockField, data):
-         """Property: ZKP creation and verification should succeed for valid inputs."""
-         coeffs, _, _, _ = data.draw(self.coeffs_and_shares_strategy(mock_field_fast))
-         assume(coeffs)
+        """Property: ZKP creation and verification should succeed for valid inputs."""
+        coeffs, _, _, _ = data.draw(self.coeffs_and_shares_strategy(mock_field_fast))
+        assume(coeffs)
 
-         try:
-              commitments = default_vss.create_commitments(coeffs)
-              proof = default_vss.create_polynomial_proof(coeffs, commitments)
+        try:
+            commitments = default_vss.create_commitments(coeffs)
+            proof = default_vss.create_polynomial_proof(coeffs, commitments)
 
-              # Verify the proof itself
-              assert default_vss.verify_polynomial_proof(proof, commitments) is True, "ZKP verification failed for valid proof"
+            # Verify the proof itself
+            assert default_vss.verify_polynomial_proof(proof, commitments) is True, "ZKP verification failed for valid proof"
 
-              # Also verify using the combined method
-              assert default_vss.verify_commitments_with_proof(commitments, proof) is True, "Combined ZKP verification failed"
+            # Also verify using the combined method
+            assert default_vss.verify_commitments_with_proof(commitments, proof) is True, "Combined ZKP verification failed"
 
-              # Explicitly test challenge consistency check as well
-              assert default_vss._verify_challenge_consistency(proof, commitments) is True, "Challenge consistency check failed"
+            # Explicitly test challenge consistency check as well
+            assert default_vss._verify_challenge_consistency(proof, commitments) is True, "Challenge consistency check failed"
 
-         except (ParameterError, ValueError, SecurityError, MemoryError) as e:
-              test_logger.debug(f"Hypothesis ZKP roundtrip caught expected error: {e}")
-         except Exception as e:
-              pytest.fail(f"Unexpected exception during ZKP roundtrip: {e}")
+        except (ParameterError, ValueError, SecurityError, MemoryError) as e:
+            test_logger.debug(f"Hypothesis ZKP roundtrip caught expected error: {e}")
+        except Exception as e:
+            pytest.fail(f"Unexpected exception during ZKP roundtrip: {e}")
 
     @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.data_too_large])
     @given(st.data())
     def test_prop_zkp_tampered_proof_fails(self, default_vss: FeldmanVSS, mock_field_fast: MockField, data):
-         """Property: Tampered ZKP should fail verification."""
-         coeffs, _, _, _ = data.draw(self.coeffs_and_shares_strategy(mock_field_fast))
-         assume(coeffs)
+        """Property: Tampered ZKP should fail verification."""
+        coeffs, _, _, _ = data.draw(self.coeffs_and_shares_strategy(mock_field_fast))
+        assume(coeffs)
 
-         try:
-              commitments = default_vss.create_commitments(coeffs)
-              proof = default_vss.create_polynomial_proof(coeffs, commitments)
+        try:
+            commitments = default_vss.create_commitments(coeffs)
+            proof = default_vss.create_polynomial_proof(coeffs, commitments)
 
-              # Tamper with challenge
-              tampered_proof_c = copy.deepcopy(proof)
-              tampered_proof_c['challenge'] = (proof['challenge'] + 1) % mock_field_fast.prime
-              assert default_vss.verify_polynomial_proof(tampered_proof_c, commitments) is False, "Verification passed for tampered challenge"
+            # Tamper with challenge
+            tampered_proof_c = copy.deepcopy(proof)
+            tampered_proof_c["challenge"] = (proof["challenge"] + 1) % mock_field_fast.prime
+            assert default_vss.verify_polynomial_proof(tampered_proof_c, commitments) is False, "Verification passed for tampered challenge"
 
-              # Tamper with a response
-              tampered_proof_r = copy.deepcopy(proof)
-              if tampered_proof_r['responses']:
-                 idx_to_tamper = random.randrange(len(tampered_proof_r['responses']))
-                 tampered_proof_r['responses'][idx_to_tamper] = (proof['responses'][idx_to_tamper] + 1) % mock_field_fast.prime
-                 assert default_vss.verify_polynomial_proof(tampered_proof_r, commitments) is False, "Verification passed for tampered response"
+            # Tamper with a response
+            tampered_proof_r = copy.deepcopy(proof)
+            if tampered_proof_r["responses"]:
+                idx_to_tamper = random.randrange(len(tampered_proof_r["responses"]))
+                tampered_proof_r["responses"][idx_to_tamper] = (proof["responses"][idx_to_tamper] + 1) % mock_field_fast.prime
+                assert default_vss.verify_polynomial_proof(tampered_proof_r, commitments) is False, (
+                    "Verification passed for tampered response"
+                )
 
-              # Tamper with a blinding commitment
-              tampered_proof_bc = copy.deepcopy(proof)
-              if tampered_proof_bc['blinding_commitments']:
-                  idx_bc = random.randrange(len(tampered_proof_bc['blinding_commitments']))
-                  orig_bc, orig_br = tampered_proof_bc['blinding_commitments'][idx_bc]
-                  tampered_proof_bc['blinding_commitments'][idx_bc] = ((orig_bc + 1) % mock_field_fast.prime, orig_br)
-                  assert default_vss.verify_polynomial_proof(tampered_proof_bc, commitments) is False, "Verification passed for tampered blinding commitment"
+            # Tamper with a blinding commitment
+            tampered_proof_bc = copy.deepcopy(proof)
+            if tampered_proof_bc["blinding_commitments"]:
+                idx_bc = random.randrange(len(tampered_proof_bc["blinding_commitments"]))
+                orig_bc, orig_br = tampered_proof_bc["blinding_commitments"][idx_bc]
+                tampered_proof_bc["blinding_commitments"][idx_bc] = ((orig_bc + 1) % mock_field_fast.prime, orig_br)
+                assert default_vss.verify_polynomial_proof(tampered_proof_bc, commitments) is False, (
+                    "Verification passed for tampered blinding commitment"
+                )
 
-         except (ParameterError, ValueError, SecurityError, MemoryError) as e:
-              test_logger.debug(f"Hypothesis ZKP tampering test caught expected error: {e}")
-         except Exception as e:
-              pytest.fail(f"Unexpected exception during ZKP tampering test: {e}")
-
+        except (ParameterError, ValueError, SecurityError, MemoryError) as e:
+            test_logger.debug(f"Hypothesis ZKP tampering test caught expected error: {e}")
+        except Exception as e:
+            pytest.fail(f"Unexpected exception during ZKP tampering test: {e}")
 
     @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.data_too_large])
     @given(st.data())
@@ -220,13 +225,13 @@ class TestPropertyBased:
 
             assert gen == default_vss.generator
             assert prime == default_vss.group.prime
-            assert is_hash is True # Should always be hash based
+            assert is_hash is True  # Should always be hash based
             assert len(deserialized) == len(commitments)
             # Compare components of each commitment tuple
             for i in range(len(commitments)):
-                assert deserialized[i][0] == commitments[i][0] # Hash value
-                assert deserialized[i][1] == commitments[i][1] # Randomizer
-                assert deserialized[i][2] == commitments[i][2] # Entropy (bytes or None)
+                assert deserialized[i][0] == commitments[i][0]  # Hash value
+                assert deserialized[i][1] == commitments[i][1]  # Randomizer
+                assert deserialized[i][2] == commitments[i][2]  # Entropy (bytes or None)
 
             # Also test serialization with proof
             proof = default_vss.create_polynomial_proof(coeffs, commitments)
@@ -235,24 +240,28 @@ class TestPropertyBased:
 
             assert len(deser_comm) == len(commitments)
             assert isinstance(deser_proof, dict)
-            assert deser_proof['challenge'] == proof['challenge']
-            assert len(deser_proof['responses']) == len(proof['responses'])
+            assert deser_proof["challenge"] == proof["challenge"]
+            assert len(deser_proof["responses"]) == len(proof["responses"])
             # Could add more detailed proof comparison if needed
 
         except (ParameterError, ValueError, SerializationError, SecurityError, MemoryError) as e:
-             test_logger.debug(f"Hypothesis serialization roundtrip caught expected error: {e}")
+            test_logger.debug(f"Hypothesis serialization roundtrip caught expected error: {e}")
         except Exception as e:
-             pytest.fail(f"Unexpected exception during serialization roundtrip: {e}")
+            pytest.fail(f"Unexpected exception during serialization roundtrip: {e}")
 
     # Note: Refresh shares can be computationally intensive for property tests
-    @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.data_too_large, HealthCheck.too_slow], max_examples=20) # Reduce examples for refresh
+    @settings(
+        deadline=None,
+        suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.data_too_large, HealthCheck.too_slow],
+        max_examples=20,
+    )  # Reduce examples for refresh
     @given(st.data())
     def test_prop_refresh_preserves_secret(self, default_vss: FeldmanVSS, mock_field_fast: MockField, data):
         """Property: Share refreshing should preserve the original secret."""
         coeffs, shares, t, n = data.draw(self.coeffs_and_shares_strategy(mock_field_fast))
 
         assume(coeffs)
-        assume(len(shares) >= t) # Need enough shares to potentially refresh
+        assume(len(shares) >= t)  # Need enough shares to potentially refresh
 
         try:
             original_commitments = default_vss.create_commitments(coeffs)
@@ -263,11 +272,11 @@ class TestPropertyBased:
 
             # Perform the refresh
             with warnings.catch_warnings():
-                 # Ignore potential security warnings about insufficient shares during refresh in edge cases
-                 warnings.simplefilter("ignore", SecurityWarning)
-                 new_shares, new_commitments, verification_data = default_vss.refresh_shares(
-                     shares_copy, t, n, original_commitments, participant_ids
-                 )
+                # Ignore potential security warnings about insufficient shares during refresh in edge cases
+                warnings.simplefilter("ignore", SecurityWarning)
+                new_shares, new_commitments, verification_data = default_vss.refresh_shares(
+                    shares_copy, t, n, original_commitments, participant_ids
+                )
 
             # Verify reconstruction from new shares using MockShamir
             shamir_mock = MockShamirSecretSharing(mock_field_fast)
@@ -286,13 +295,13 @@ class TestPropertyBased:
 
             # Optional: Verify new shares against new commitments
             for share_id in new_shares:
-                 x, y = new_shares[share_id]
-                 assert default_vss.verify_share(x, y, new_commitments), "Refreshed share failed verification against new commitments"
+                x, y = new_shares[share_id]
+                assert default_vss.verify_share(x, y, new_commitments), "Refreshed share failed verification against new commitments"
 
         except (ParameterError, ValueError, SecurityError, MemoryError) as e:
-             # Allow expected errors, especially SecurityError if refresh fails due to byzantine simulation
-             test_logger.debug(f"Hypothesis refresh secret preservation caught expected error: {e}")
+            # Allow expected errors, especially SecurityError if refresh fails due to byzantine simulation
+            test_logger.debug(f"Hypothesis refresh secret preservation caught expected error: {e}")
         except Exception as e:
-             # Catch unexpected errors during complex refresh
-             test_logger.error(f"Unexpected error during Hypothesis refresh test: {e}", exc_info=True)
-             pytest.fail(f"Unexpected exception in refresh test: {e}")
+            # Catch unexpected errors during complex refresh
+            test_logger.error(f"Unexpected error during Hypothesis refresh test: {e}", exc_info=True)
+            pytest.fail(f"Unexpected exception in refresh test: {e}")
