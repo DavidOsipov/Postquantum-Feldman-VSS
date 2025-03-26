@@ -131,7 +131,7 @@ def get_prime(bits: int, safe: bool = True) -> mpz:
         while not bool(gmpy2.is_prime(p, 25)):
             p = mpz(secrets.randbits(min_bits) | (1 << (min_bits - 1)) | 1)
 
-    end_time = time.monotonic()
+    end_time: float = time.monotonic()
     test_logger.info("Prime generation complete in %.2fs.", end_time - start_time)
     _prime_cache[cache_key] = p
     return p
@@ -209,11 +209,11 @@ class MockField:
         x_val = mpz(x)
         y = mpz(0)
         for coeff in reversed(poly):
-            # Ensure coeff is mpz before arithmetic, use f_mod
-            # Convert result back to mpz to ensure correct type
-            # This fixes the issue where f_mod could return mpfr in some cases
-            result: mpz = gmpy2.f_mod(mpz(y * x_val + mpz(coeff)), self.prime)
-            y = mpz(result)  # Explicitly cast back to mpz
+            # Always ensure we're working with mpz types
+            y = mpz(y) * mpz(x_val)  # Multiply by x
+            y: mpz | mpfr = mpz(y) + mpz(coeff)  # Add coefficient
+            # Apply modulo operation
+            y = gmpy2.f_mod(mpz(y), self.prime)  # Explicit cast to mpz
         return y
 
     def interpolate(self, shares: list[SharePoint]) -> mpz:
