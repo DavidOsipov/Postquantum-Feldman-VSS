@@ -45,6 +45,9 @@ jobs:
     uses: ./.github/workflows/python-tests.yml
     # Add secrets inheritance if python-tests.yml needs them (e.g., for private package indices)
     # secrets: inherit
+    permissions:
+      contents: read   # Needed by python-tests.yml to checkout code
+      actions: write   # Needed by python-tests.yml to upload coverage artifact
 
   Analyze:
     # Analyze still needs Python_Tests to ensure code builds/passes basic checks before analysis
