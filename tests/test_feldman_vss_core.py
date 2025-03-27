@@ -45,6 +45,8 @@ from tests.test_conftest import (
     HAS_BLAKE3,
     TEST_PRIME_BITS_FAST,  # Import TEST_PRIME_BITS_FAST
     MockField,
+    test_prime_fast,  # Import the fixture
+    test_prime_pq,  # Import the fixture
 )
 
 # --- Test VSSConfig ---

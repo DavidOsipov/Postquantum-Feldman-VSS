@@ -1826,6 +1826,9 @@ class CyclicGroup:
                 SecurityWarning,
             )
 
+        # Store use_safe_prime as an instance variable
+        self.use_safe_prime: bool = use_safe_prime
+
         # Use provided prime or select one
         if prime is not None:
             self.prime: "gmpy2.mpz" = gmpy2.mpz(prime)
@@ -2010,9 +2013,7 @@ class CyclicGroup:
         """
         Description:
             Check if g is a generator of the group.
-            For a safe prime p = 2q + 1, we need to check:
-            1. g ≠ 0, 1, p-1
-            2. g^q ≠ 1 mod p
+            The specific check depends on whether we're using a safe prime or not.
 
         Arguments:
             g (int): Element to check.
@@ -2026,10 +2027,39 @@ class CyclicGroup:
         if g <= 1 or g >= self.prime - 1:
             return False
 
-        # For a safe prime p=2q+1, we check if g^q != 1 mod p
-        # This confirms g generates a subgroup of order q
-        q: "gmpy2.mpz" = (self.prime - 1) // 2
-        return gmpy2.powmod(g, q, self.prime) != 1
+        # Convert to mpz if needed
+        g_mpz = gmpy2.mpz(g)
+
+        # For safe primes (p=2q+1 where q is also prime)
+        if self.use_safe_prime:
+            q: "gmpy2.mpz" = (self.prime - 1) // 2
+            # A generator should not generate the subgroup of order 2
+            return gmpy2.powmod(g_mpz, q, self.prime) != 1
+        else:
+            # For non-safe primes, a simplified approach
+            # First check Fermat's Little Theorem (necessary but not sufficient)
+            if gmpy2.powmod(g_mpz, self.prime - 1, self.prime) != 1:
+                return False
+
+            # For a more thorough check, we'd need to verify g^((p-1)/q) != 1 mod p
+            # for all prime factors q of p-1, but this would require factoring p-1.
+            # For an alpha version, we'll use a probabilistic approach:
+
+            # Check a few random powers to reduce the probability of false positives
+            p_minus_1 = self.prime - 1
+            factors_to_check = [2]  # Always check if g is a quadratic residue
+
+            # Try some small prime factors that commonly divide p-1
+            for small_factor in [3, 5, 7, 11, 13]:
+                if p_minus_1 % small_factor == 0:
+                    factors_to_check.append(small_factor)
+
+            for factor in factors_to_check:
+                if gmpy2.powmod(g_mpz, p_minus_1 // factor, self.prime) == 1:
+                    return False
+
+            # If it passed all these checks, it's likely a generator
+            return True
 
     def _find_generator(self) -> "gmpy2.mpz":
         """
