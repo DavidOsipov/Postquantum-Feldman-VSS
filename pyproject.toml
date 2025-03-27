@@ -141,8 +141,9 @@ skips = [
   "B311",
 ] # Skip B311 as it warns against random, but your code uses secrets module properly
 
-[tool.bandit.assert_used]
-skips = ["*/test_*.py"] # Allow asserts in test files
+[tool.bandit.per-file-ignores]
+"tests/*.py" = ["S101", "B101"]
+
 
 [tool.bandit.tests]
 # Cryptography-related
@@ -363,6 +364,7 @@ ignore = [
   "S101",
   "F841",
   "RUF018",
+  "F811",
 ] # Allow asserts and unused vars in tests
 
 [tool.ruff.pydocstyle]
