@@ -23,7 +23,7 @@ jobs:
 
       - name: Setup Ruby
         id: setup-ruby
-        uses: ruby/setup-ruby@7886c6653556e1164c58a7603d88286b5f708293
+        uses: ruby/setup-ruby@354a1ad156761f5ee2b7b13fa8e09943a5e8d252
         with:
           ruby-version: '3.4.2'
           bundler-cache: true
