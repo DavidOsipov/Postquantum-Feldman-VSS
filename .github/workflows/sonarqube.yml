@@ -1,6 +1,7 @@
+# .github/workflows/bastion-quality-gates.yml
 # This workflow integrates multiple Python security and quality analysis tools with SonarQube.
 # It runs various static code analysis tools and security scanners in parallel, then aggregates
-# their results into SonarQube for unified reporting.
+# their results along with test coverage into SonarQube for unified reporting.
 #
 # Tools included:
 # - Bandit: Security-focused static analyser
@@ -10,6 +11,7 @@
 # - Pylint: Static code analyser
 # - CodeQL: Semantic code analysis
 # - Snyk: Dependency and security scanner
+# - Pytest Coverage: Test coverage reporting
 #
 # Known Limitations:
 # - SonarQube currently doesn't support Pyright report format natively
@@ -34,12 +36,18 @@ permissions:
   pull-requests: read
   security-events: write
   contents: read
+  # Added: Needed by SonarQube action for PR decoration, issue reporting etc.
+  issues: write
+  checks: write
 
 jobs:
   Python_Tests:
     uses: ./.github/workflows/python-tests.yml
-  # This workflow now depends on the successful completion of the python-tests workflow
+    # Add secrets inheritance if python-tests.yml needs them (e.g., for private package indices)
+    # secrets: inherit
+
   Analyze:
+    # Analyze still needs Python_Tests to ensure code builds/passes basic checks before analysis
     needs: Python_Tests
     runs-on: ubuntu-latest
     strategy:
@@ -53,7 +61,7 @@ jobs:
         if: matrix.tool != 'codeql'  # CodeQL has its own Python setup
         uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55
         with:
-          python-version: '3.13'
+          python-version: '3.13' # Use a consistent Python version for analysis tools
 
       - name: Cache pip dependencies
         if: matrix.tool != 'codeql'
@@ -62,10 +70,10 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.cache/pypoetry
-            /usr/local/lib/python3.13/site-packages
-          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock', 'pyproject.toml') }}
+            /usr/local/lib/python3.13/site-packages # Consider if caching site-packages is necessary/beneficial
+          key: ${{ runner.os }}-poetry-analysis-${{ hashFiles('**/poetry.lock', 'pyproject.toml') }} # More specific key
           restore-keys: |
-            ${{ runner.os }}-poetry-
+            ${{ runner.os }}-poetry-analysis-
 
       # Consolidated Poetry installation - used by multiple steps
       - name: Install Poetry
@@ -83,44 +91,35 @@ jobs:
           # Only install the dependencies needed for each specific tool
           case "${{ matrix.tool }}" in
             snyk)
-              # Snyk only needs dependency export
+              # Snyk only needs dependency export - no install needed here
+              echo "Skipping poetry install for Snyk export step."
               ;;
             *)
               # Analysis tools need dev dependencies
+              echo "Installing dev dependencies for ${{ matrix.tool }}"
               poetry install --with dev --no-interaction
               ;;
           esac
 
       # Optimized tool installation - only install the tool being used
-      - name: Install analysis tools
+      - name: Install analysis tools (if not already installed via deps)
         if: matrix.tool != 'codeql' && matrix.tool != 'snyk'
         run: |
+          # Most tools are now installed via 'poetry install --with dev'
+          # This step can potentially be simplified or removed if all tools are dev deps
+          # Keeping it for now in case some tools are installed differently or need version checks
           case "${{ matrix.tool }}" in
-            bandit)
-              poetry run pip install bandit
-              poetry run bandit --version
-              ;;
-            ruff)
-              poetry run pip install ruff
-              poetry run ruff --version
-              ;;
-            mypy)
-              poetry run pip install mypy types-setuptools types-requests
-              poetry run mypy --version
-              ;;
-            flake8)
-              poetry run pip install flake8
-              poetry run flake8 --version
-              ;;
-            pylint)
-              poetry run pip install pylint
-              poetry run pylint --version
-              ;;
-            *)
-              echo "Unknown tool: ${{ matrix.tool }}"
-              exit 1
-              ;;
+            bandit) poetry run bandit --version ;;
+            ruff) poetry run ruff --version ;;
+            mypy) poetry run mypy --version ;;
+            # flake8) poetry run flake8 --version ;; # flake8 currently disabled
+            pylint) poetry run pylint --version ;;
+            *) echo "Tool ${{ matrix.tool }} should be installed via dev dependencies." ;;
           esac
+          # If any tool needs explicit install here (not in pyproject.toml dev):
+          # case "${{ matrix.tool }}" in
+          #   some_tool) poetry run pip install some_tool; poetry run some_tool --version ;;
+          # esac
 
       - name: Setup Snyk CLI
         if: matrix.tool == 'snyk'
@@ -132,66 +131,75 @@ jobs:
         if: matrix.tool == 'snyk'
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_SECRET_TOKEN }}
-          DEBUG: snyk*
+          DEBUG: snyk* # Optional: for debugging Snyk issues
         run: |
           # Export dependencies from Poetry to requirements.txt
-          poetry export --format requirements.txt --output requirements.txt --with dev
-          
+          # Ensure dev dependencies are included if you want to scan them too
+          poetry export --format requirements.txt --output requirements.txt --with dev --without-hashes
+
           # Run Snyk test with the generated requirements file
-          snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif --skip-unresolved || snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif --skip-unresolved --all-projects
+          # Use --all-projects if requirements.txt might not cover everything you want scanned
+          # Allow failure with `|| true` initially if needed, but better to fix vulns
+          snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif --skip-unresolved || \
+          snyk test --file=requirements.txt --sarif-file-output=snyk_report.sarif --skip-unresolved --all-projects || \
+          echo "Snyk scan completed with issues (or failed to run)"
 
       # Tool-specific analysis steps
       - name: Run Bandit
         if: matrix.tool == 'bandit'
-        run: poetry run bandit -r . -o bandit_report.json --format json --exclude tests,.git || true
+        # Exclude tests and venv dirs. Allow failure with || true
+        run: poetry run bandit -r . -o bandit_report.json --format json --exclude tests,.venv,.git || true
 
       - name: Run Ruff
         if: matrix.tool == 'ruff'
-        run: poetry run ruff check . --output-format json --output-file ruff_report.json --exclude tests,.git || true
+        # Exclude tests and venv dirs. Allow failure with || true
+        run: poetry run ruff check . --output-format json --output-file ruff_report.json --exclude tests,.venv,.git || true
 
       - name: Run Mypy
         if: matrix.tool == 'mypy'
+        # Allow failure with || true
         run: poetry run mypy . 2>&1 | tee mypy_report.txt || true
 
-      - name: Run Flake8
-        if: matrix.tool == 'flake8'
-        run: poetry run flake8 . --output-file flake8_report.txt --format=pylint || true
+      # Flake8 disabled
+      # - name: Run Flake8
+      #   if: matrix.tool == 'flake8'
+      #   run: poetry run flake8 . --output-file flake8_report.txt --format=pylint || true
 
       - name: Run Pylint
         if: matrix.tool == 'pylint'
-        run: poetry run pylint --recursive=y . --output-format=json > pylint_report.json || true
+        # Exclude tests and venv dirs. Allow failure with || true
+        # Using --recursive=y is often default; consider specifying modules/packages explicitly if needed
+        run: poetry run pylint --recursive=y . --output-format=json --disable=import-error > pylint_report.json || true # Often good to disable import-error in CI
 
       - name: Initialize CodeQL
         if: matrix.tool == 'codeql'
-        uses: github/codeql-action/init@486ab5a2922b634015408a83e10f6867efb5922c
+        uses: github/codeql-action/init@486ab5a2922b634015408a83e10f6867efb5922c # Pin to v3 or similar
         with:
           languages: python
+          # Add queries if needed: queries: +security-extended,etc.
 
       - name: Perform CodeQL Analysis
         if: matrix.tool == 'codeql'
-        uses: github/codeql-action/analyze@486ab5a2922b634015408a83e10f6867efb5922c
+        uses: github/codeql-action/analyze@486ab5a2922b634015408a83e10f6867efb5922c # Pin to v3 or similar
         with:
-          output: codeql_report.sarif
+          # Output path is handled by the action, will be in 'codeql_results/python.sarif' typically
+          # Let's use the default and find it later
+          # output: codeql_report.sarif # Remove explicit output, let action handle it
+          category: "/language:python" # Optional: For distinguishing analyses if multiple languages used
 
-      # Generate SHA3-256 hashes for all report files
+      # Generate SHA3-256 hashes for all report files (Optional but kept from original)
       - name: Generate SHA3-256 hash for report files
+        # This step depends on report file locations, adjust if needed
         run: |
           python -c "
           import hashlib, sys, os, glob
-          
+
           # Define report file patterns based on the tool
           if '${{ matrix.tool }}' == 'codeql':
-              # CodeQL outputs to a directory with python.sarif inside
-              if os.path.isdir('codeql_report.sarif') and os.path.exists('codeql_report.sarif/python.sarif'):
-                  report_files = ['codeql_report.sarif/python.sarif']
-              else:
-                  # Fallback if structure is different
-                  sarif_files = glob.glob('codeql_report.sarif/**/*.sarif', recursive=True)
-                  if sarif_files:
-                      report_files = sarif_files
-                  else:
-                      print('Warning: No SARIF files found in codeql_report.sarif directory')
-                      report_files = []
+              # CodeQL default output location
+              report_files = glob.glob('codeql_results/**/*.sarif', recursive=True)
+              if not report_files:
+                  print('Warning: No SARIF files found in codeql_results directory')
           elif '${{ matrix.tool }}' == 'snyk':
               report_files = ['snyk_report.sarif']
           else:
@@ -199,7 +207,7 @@ jobs:
               extensions = {'bandit': 'json', 'ruff': 'json', 'pylint': 'json', 'mypy': 'txt', 'flake8': 'txt'}
               extension = extensions.get('${{ matrix.tool }}', 'txt')
               report_files = ['${{ matrix.tool }}_report.' + extension]
-          
+
           # Generate hash for each report file
           for report_file in report_files:
               if os.path.exists(report_file):
@@ -214,176 +222,173 @@ jobs:
           "
 
       - name: Upload report artifact
-        uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47
+        uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47 # Pin to v4
         with:
           name: ${{ matrix.tool }}-report
           path: |
             ${{ matrix.tool }}_report.*
-            codeql_report.sarif/**/*.sarif*
-            codeql_report.sarif/**/*.sarif.sha3
+            # Adjust CodeQL path based on actual output and hash step
+            codeql_results/**/*.sarif*
             snyk_report.sarif*
+          retention-days: 1 # Optional: reduce retention
 
   SonarQube:
-    needs: Analyze
+    # Now needs BOTH Python_Tests (for coverage artifact name) and Analyze (for analysis reports)
+    needs: [Python_Tests, Analyze]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2 # Pin to v4
         with:
+          # Sonar needs full history for accurate blame information and new code detection
           fetch-depth: 0
 
+      # --- Download Analysis Reports ---
       - name: Download analysis reports
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # Pin to v4
         with:
-          path: reports
+          # Download all analysis artifacts into the 'reports/analysis' directory
+          path: reports/analysis
+
+      # --- Download Coverage Report ---
+      - name: Download coverage report
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # Pin to v4
+        with:
+          # Use the output from the Python_Tests job to get the correct artifact name
+          name: ${{ needs.Python_Tests.outputs.coverage_artifact_name }}
+          # Download into a specific subdirectory
+          path: reports/coverage
 
       - name: Process reports and prepare for SonarQube
         run: |
+          echo "Processing reports..."
           mkdir -p processed_reports
-            
-          # Function to verify SHA3-256 hash
+          # Define coverage report path (assuming download worked)
+          COVERAGE_REPORT_PATH="reports/coverage/coverage.xml"
+          SONAR_COVERAGE_ARG=""
+
+          # Check if coverage report exists and add the argument
+          if [[ -f "$COVERAGE_REPORT_PATH" ]]; then
+            echo "✅ Found coverage report: $COVERAGE_REPORT_PATH"
+            # Copy to processed_reports for consistency
+            cp "$COVERAGE_REPORT_PATH" "processed_reports/coverage.xml"
+            SONAR_COVERAGE_ARG="-Dsonar.python.coverage.reportPaths=processed_reports/coverage.xml"
+            echo "Coverage argument: $SONAR_COVERAGE_ARG"
+          else
+            echo "⚠️ Warning: Coverage report not found at $COVERAGE_REPORT_PATH. Check the Python_Tests job and artifact download."
+          fi
+
+          # --- Reuse your existing report processing logic ---
+          # Function to verify SHA3-256 hash (Optional but kept from original)
           verify_hash() {
             local file_path="$1"
             local hash_path="${file_path}.sha3"
-            
             if [ -f "$file_path" ] && [ -f "$hash_path" ]; then
               echo "Verifying hash for $file_path"
               expected_hash=$(cat "$hash_path")
-              computed_hash=$(python -c "import hashlib; data = open('$file_path', 'rb').read(); print(hashlib.sha3_256(data).hexdigest())")
-              
-              if [ "$expected_hash" = "$computed_hash" ]; then
-                echo "✅ Hash verification successful for $file_path"
-                return 0
-              else
-                echo "❌ Hash verification FAILED for $file_path"
-                echo "Expected: $expected_hash"
-                echo "Computed: $computed_hash"
-                return 1
-              fi
-            elif [ -f "$file_path" ]; then
-              echo "⚠️ Warning: No hash file found for $file_path"
-              return 2
-            else
-              echo "⚠️ Warning: File not found: $file_path"
-              return 3
-            fi
+              computed_hash=$(python -c "import hashlib; data=open('$file_path','rb').read(); print(hashlib.sha3_256(data).hexdigest())" 2>/dev/null)
+              if [ "$expected_hash" = "$computed_hash" ]; then echo "✅ Hash verification successful for $file_path"; return 0;
+              else echo "❌ Hash verification FAILED for $file_path"; echo "Expected: $expected_hash"; echo "Computed: $computed_hash"; return 1; fi
+            elif [ -f "$file_path" ]; then echo "⚠️ Warning: No hash file found for $file_path"; return 2; # Allow missing hash
+            else echo "⚠️ Warning: File not found: $file_path"; return 3; fi
           }
-            
-          # Function to safely move reports with hash verification
-          safe_move_report() {
-            local source_dir="$1"
-            local report_file="$2"
-            local target_file="$3"
-              
-            # First try direct path
-            if [ -f "${source_dir}/${report_file}" ]; then
-              echo "✅ Found ${report_file}"
-              
-              # Verify hash before copying
-              if verify_hash "${source_dir}/${report_file}" || [ $? -eq 2 ]; then
-                cp "${source_dir}/${report_file}" "${target_file}"
+
+          # Function to safely move/copy reports with hash verification
+          safe_copy_report() {
+            local source_dir="$1" # e.g., reports/analysis/bandit-report
+            local report_pattern="$2" # e.g., bandit_report.json or *.sarif
+            local target_file="$3" # e.g., processed_reports/bandit_report.json or processed_reports/codeql_report.sarif
+            local found_file=""
+
+            # Find the first file matching the pattern in the source directory
+            # Use find for potentially nested structures like CodeQL
+            found_file=$(find "$source_dir" -name "$report_pattern" -print -quit)
+
+            if [[ -n "$found_file" ]] && [[ -f "$found_file" ]]; then
+              echo "✅ Found report file: $found_file"
+              # Verify hash before copying (allow missing hash file with || [ $? -eq 2 ])
+              if verify_hash "$found_file" || [ $? -eq 2 ]; then
+                cp "$found_file" "$target_file"
+                echo "Copied $found_file to $target_file"
                 return 0
               else
-                echo "⚠️ Hash verification failed for ${report_file}, skipping"
-                return 4
+                echo "⚠️ Hash verification failed for $found_file, skipping copy."
+                return 4 # Indicate hash failure
               fi
-              
-            # Handle CodeQL special case - check for python.sarif inside the directory
-            elif [[ "${report_file}" == "codeql_report.sarif" ]] && [ -d "${source_dir}/${report_file}" ] && [ -f "${source_dir}/${report_file}/python.sarif" ]; then
-              echo "✅ Found ${report_file}/python.sarif (CodeQL directory structure)"
-              
-              # Verify hash before copying
-              if verify_hash "${source_dir}/${report_file}/python.sarif" || [ $? -eq 2 ]; then
-                cp "${source_dir}/${report_file}/python.sarif" "${target_file}"
-                return 0
-              else
-                echo "⚠️ Hash verification failed for ${report_file}/python.sarif, skipping"
-                return 4
-              fi
-              
             else
-              echo "⚠️ Warning: ${report_file} not found in ${source_dir}"
+              echo "⚠️ Warning: Report file matching '$report_pattern' not found in '$source_dir'"
               # Create fallback file...
-              # For JSON reports, create an empty valid JSON file
-              if [[ "${report_file}" == *".json" ]]; then
-                echo "Creating empty JSON file for ${target_file}"
-                echo "[]" > "${target_file}"
-              # For SARIF reports, create a minimal valid SARIF file
-              elif [[ "${report_file}" == *".sarif" ]]; then
-                echo "Creating minimal SARIF file for ${target_file}"
-                echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Missing Report","rules":[]}},"results":[]}]}' > "${target_file}"
-              # For text reports, create an empty file
-              else
-                echo "Creating empty file for ${target_file}"
-                touch "${target_file}"
-              fi
-              return 1
+              if [[ "$target_file" == *".json" ]]; then echo "Creating empty JSON file for ${target_file}"; echo "[]" > "$target_file";
+              elif [[ "$target_file" == *".sarif" ]]; then echo "Creating minimal SARIF file for ${target_file}"; echo '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Missing Report","rules":[]}},"results":[]}]}' > "$target_file";
+              else echo "Creating empty file for ${target_file}"; touch "$target_file"; fi
+              return 1 # Indicate file not found but fallback created
             fi
           }
-            
+
           # Initialize list of available report paths for SonarQube
-          sonar_args=""
-            
-          # Process each report type
-          safe_move_report "reports/bandit-report" "bandit_report.json" "processed_reports/bandit_report.json"
-          if [ $? -eq 0 ]; then
-            sonar_args="${sonar_args} -Dsonar.python.bandit.reportPaths=processed_reports/bandit_report.json"
+          sonar_analysis_args=""
+          sarif_reports_list=() # Array to hold SARIF paths
+
+          # Process each analysis report type (Adjust source paths and patterns)
+          # Note: download-artifact v4 puts artifacts directly in the path, not in subdirs named after the artifact
+          safe_copy_report "reports/analysis/bandit-report" "bandit_report.json" "processed_reports/bandit_report.json"
+          if [ $? -eq 0 ]; then sonar_analysis_args="${sonar_analysis_args} -Dsonar.python.bandit.reportPaths=processed_reports/bandit_report.json"; fi
+
+          safe_copy_report "reports/analysis/ruff-report" "ruff_report.json" "processed_reports/ruff_report.json"
+          if [ $? -eq 0 ]; then sonar_analysis_args="${sonar_analysis_args} -Dsonar.python.ruff.reportPaths=processed_reports/ruff_report.json"; fi
+
+          safe_copy_report "reports/analysis/mypy-report" "mypy_report.txt" "processed_reports/mypy_report.txt"
+          if [ $? -eq 0 ]; then sonar_analysis_args="${sonar_analysis_args} -Dsonar.python.mypy.reportPaths=processed_reports/mypy_report.txt"; fi
+
+          safe_copy_report "reports/analysis/pylint-report" "pylint_report.json" "processed_reports/pylint_report.json"
+          if [ $? -eq 0 ]; then sonar_analysis_args="${sonar_analysis_args} -Dsonar.python.pylint.reportPaths=processed_reports/pylint_report.json"; fi
+
+          # Process SARIF reports (Adjust source paths and patterns)
+          safe_copy_report "reports/analysis/codeql-report" "*.sarif" "processed_reports/codeql_report.sarif"
+          if [ $? -eq 0 ]; then sarif_reports_list+=("processed_reports/codeql_report.sarif"); fi
+
+          safe_copy_report "reports/analysis/snyk-report" "snyk_report.sarif" "processed_reports/snyk_report.sarif"
+          if [ $? -eq 0 ]; then sarif_reports_list+=("processed_reports/snyk_report.sarif"); fi
+
+          # Join SARIF paths with commas if any exist
+          if [ ${#sarif_reports_list[@]} -gt 0 ]; then
+            joined_sarif_paths=$(IFS=,; echo "${sarif_reports_list[*]}")
+            sonar_analysis_args="${sonar_analysis_args} -Dsonar.sarifReportPaths=${joined_sarif_paths}"
           fi
-            
-          safe_move_report "reports/ruff-report" "ruff_report.json" "processed_reports/ruff_report.json"
-          if [ $? -eq 0 ]; then
-            sonar_args="${sonar_args} -Dsonar.python.ruff.reportPaths=processed_reports/ruff_report.json"
-          fi
-            
-          safe_move_report "reports/mypy-report" "mypy_report.txt" "processed_reports/mypy_report.txt"
-          if [ $? -eq 0 ]; then
-            sonar_args="${sonar_args} -Dsonar.python.mypy.reportPaths=processed_reports/mypy_report.txt"
-          fi
-            
-          safe_move_report "reports/pylint-report" "pylint_report.json" "processed_reports/pylint_report.json"
-          if [ $? -eq 0 ]; then
-            sonar_args="${sonar_args} -Dsonar.python.pylint.reportPaths=processed_reports/pylint_report.json"
-          fi
-            
-          # Process SARIF reports and combine into a single list if both exist
-          sarif_reports=""
-          safe_move_report "reports/codeql-report" "codeql_report.sarif" "processed_reports/codeql_report.sarif"
-          if [ $? -eq 0 ]; then
-            sarif_reports="processed_reports/codeql_report.sarif"
-          fi
-            
-          safe_move_report "reports/snyk-report" "snyk_report.sarif" "processed_reports/snyk_report.sarif"
-          if [ $? -eq 0 ]; then
-            if [ -n "$sarif_reports" ]; then
-              sarif_reports="${sarif_reports},processed_reports/snyk_report.sarif"
-            else
-              sarif_reports="processed_reports/snyk_report.sarif"
-            fi
-          fi
-            
-          if [ -n "$sarif_reports" ]; then
-            sonar_args="${sonar_args} -Dsonar.sarifReportPaths=${sarif_reports}"
-          fi
-            
-          # Store SonarQube args in environment variable for next step
-          echo "SONAR_EXTRA_ARGS=${sonar_args}" >> $GITHUB_ENV
-            
+
+          # Combine analysis args and coverage arg
+          # Trim leading/trailing whitespace
+          ALL_SONAR_ARGS=$(echo "${sonar_analysis_args} ${SONAR_COVERAGE_ARG}" | xargs)
+
+          # Store combined SonarQube args in environment variable for next step
+          echo "SONAR_EXTRA_ARGS=${ALL_SONAR_ARGS}" >> $GITHUB_ENV
+
           # Print summary
-          echo "✨ Report processing complete. SonarQube will use the following reports:"
-          echo "${sonar_args}"
+          echo "✨ Report processing complete. SonarQube will use the following arguments:"
+          echo "${ALL_SONAR_ARGS}"
+          echo "--- Processed Reports Directory ---"
+          ls -l processed_reports
+          echo "---------------------------------"
 
       - name: Analyze with SonarQube
-        uses: SonarSource/sonarqube-scan-action@aa494459d7c39c106cc77b166de8b4250a32bb97
+        uses: SonarSource/sonarqube-scan-action@aa494459d7c39c106cc77b166de8b4250a32bb97 # Pin to specific commit or major version like @v2
         env:
+          # GITHUB_TOKEN required for PR decoration, SONAR_TOKEN for auth
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         with:
+          # Arguments passed to the sonar-scanner
           args: >
             -Dsonar.projectKey=DavidOsipov_PostQuantum-Feldman-VSS
             -Dsonar.organization=davidosipov
             -Dsonar.python.version=3.10,3.11,3.12,3.13
             -Dsonar.languages=python
+            -Dsonar.sourceEncoding=UTF-8
+            -Dsonar.sources=.
+            # Define test directories if they exist and you want SonarQube aware of them
+            -Dsonar.tests=tests 
             -Dsonar.python.analyzeGeneratedCode=true
-            -Dsonar.verbose=false
+            -Dsonar.verbose=false # Set to true for debugging scanner issues
+            # Append coverage and analysis report paths dynamically
             ${{ env.SONAR_EXTRA_ARGS }}

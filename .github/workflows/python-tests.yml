@@ -1,3 +1,4 @@
+# .github/workflows/python-tests.yml
 name: 🧪 Python Tests
 
 on:
@@ -7,54 +8,88 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
   workflow_call:
-    # Adding empty outputs to properly define the workflow_call trigger
     outputs:
       result:
         description: "Test execution result"
         value: ${{ jobs.test.result }}
-    
-# Adding explicit permissions following the principle of least privilege
+      # Output the coverage artifact name for the primary Python version
+      coverage_artifact_name:
+        description: "Name of the coverage report artifact for the primary Python version"
+        value: ${{ jobs.test.outputs.coverage_artifact_name }}
+
 permissions:
   contents: read
+  # Added: Allow writing artifacts
+  actions: write
 
 jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    # Define the primary version for coverage reporting
+    env:
+      # --- CHOOSE YOUR PRIMARY PYTHON VERSION FOR COVERAGE ---
+      PRIMARY_PYTHON_VERSION: '3.13'
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-    
+
+    # Define outputs for this job
+    outputs:
+      # Output the artifact name only if this is the primary version run
+      coverage_artifact_name: ${{ steps.set_coverage_artifact_name.outputs.name }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55
       with:
         python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-        
+
     - name: Cache pip dependencies
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
       with:
         path: |
           ~/.cache/pip
           ~/.cache/pypoetry
-        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock', 'pyproject.toml') }}
+          # Optional: Cache installed packages within the virtual environment
+          # .venv
+        key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock', 'pyproject.toml') }}
         restore-keys: |
-          ${{ runner.os }}-pip-${{ matrix.python-version }}-
-          
+          ${{ runner.os }}-poetry-${{ matrix.python-version }}-
+
     - name: Install Poetry
       run: |
         pip install poetry
         poetry --version
-        
-    - name: Install dependencies
+
+    - name: Install dependencies (including dev)
       run: |
-        poetry install --no-interaction
-        
-    # Uncomment and modify when you have tests
-    # - name: Run tests
-    #   run: |
-    #     poetry run pytest
+        # Ensure dev dependencies (like pytest-cov) are installed
+        poetry install --with dev --no-interaction
+
+    - name: Run tests with coverage
+      run: |
+        # --- UPDATED COMMAND ---
+        # --cov=feldman_vss.py : Measure coverage for this specific file in the root
+        # --cov-report=xml:coverage.xml : Generate Cobertura XML report named coverage.xml
+        # tests/ : Tell pytest to look for tests in the 'tests' directory
+        # --cov-fail-under=0 : Don't fail build based on coverage % (only on test failure)
+        poetry run pytest --cov=feldman_vss.py --cov-report=xml:coverage.xml tests/ --cov-fail-under=0
+
+    # --- Coverage Artifact Handling ---
+    - name: Set coverage artifact name output (only for primary version)
+      id: set_coverage_artifact_name
+      if: matrix.python-version == env.PRIMARY_PYTHON_VERSION
+      run: echo "name=coverage-report-${{ matrix.python-version }}" >> $GITHUB_OUTPUT
+
+    - name: Upload coverage report artifact (only for primary version)
+      if: matrix.python-version == env.PRIMARY_PYTHON_VERSION && steps.set_coverage_artifact_name.outputs.name != ''
+      uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47 # Pin to v4
+      with:
+        name: ${{ steps.set_coverage_artifact_name.outputs.name }}
+        path: coverage.xml
+        retention-days: 1 # Keep artifacts only for a short time if needed
