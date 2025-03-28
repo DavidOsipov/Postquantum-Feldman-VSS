@@ -100,7 +100,7 @@ msgpack-types = "==0.5.0"
 gmpy2-stubs = "==2.2.1.1"
 
 [tool.pytest.ini_options]
-addopts = "-v -x --doctest-modules --cov=feldman_vss --cov-report=term-missing --cov-report=xml --cov-report=html"
+addopts = "-v -x --doctest-modules --cov=feldman_vss --cov-report=term-missing --cov-report=xml --cov-report=html --junitxml=report.xml"
 testpaths = ["tests"]
 pythonpath = ["."]
 markers = [

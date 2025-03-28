@@ -890,7 +890,18 @@ def constant_time_compare(a: Union[int, str, bytes, "gmpy2.mpz"], b: Union[int, 
         # Final result is true only if all checks passed
         return result == 0
 
-    except (ValueError, TypeError, OverflowError) as e:
+    except ValueError as e:
+        # Check if this is specifically about values being too large
+        error_str = str(e)
+        if "too large for secure comparison" in error_str:
+            raise  # Re-raise this specific ValueError
+
+        # Log other errors but maintain security
+        error_msg: str = f"Error in constant_time_compare: {e}"
+        sanitized_msg: str = sanitize_error(error_msg, detailed_message=error_msg)
+        logger.debug(sanitized_msg)
+        return False
+    except (TypeError, OverflowError) as e:
         # Log error but maintain security
         error_msg = f"Error in constant_time_compare: {e}"
         sanitized_msg = sanitize_error(error_msg, detailed_message=error_msg)
