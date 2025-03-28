@@ -181,7 +181,7 @@ if has_blake3:
     except ImportError:
         has_blake3 = False
         warnings.warn(
-            "BLAKE3 library not found. Falling back to SHA3-256. Install BLAKE3 with: pip install blake3",
+            message="BLAKE3 library not found. Falling back to SHA3-256. Install BLAKE3 with: pip install blake3",
             category=ImportWarning,
         )
 

@@ -2,12 +2,13 @@
 # Tests for core components and helper functions of the Feldman VSS implementation.
 
 import copy
+import hashlib
 import random
 import secrets
 import time
 import warnings
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Union, cast  # Added cast
 
 import gmpy2
 import pytest
@@ -15,26 +16,31 @@ from gmpy2 import mpz
 
 # Import necessary components from the main module and conftest
 # Assuming feldman_vss is imported directly based on conftest structure
-import feldman_vss  # Added import
+import feldman_vss
 from feldman_vss import (
     MIN_PRIME_BITS,
-    CommitmentList,  # Added import
+    CommitmentList,
     CyclicGroup,
     FeldmanVSS,
     FieldElement,
+    MemoryMonitor,
     ParameterError,
+    SafeLRUCache,
     SecurityError,
     SecurityWarning,
-    ShareDict,  # Added import
-    VerificationError,  # Added import
+    SerializationError,
+    ShareDict,
+    VerificationError,
     VSSConfig,
     check_memory_safety,
     compute_checksum,
     constant_time_compare,
     create_secure_deterministic_rng,
+    estimate_exp_result_size,
     estimate_mpz_operation_memory,
     estimate_mpz_size,
     get_feldman_vss,
+    get_system_memory,
     sanitize_error,
     secure_redundant_execution,
     validate_timestamp,
@@ -43,10 +49,8 @@ from tests.test_conftest import (
     DEFAULT_PRIME_BITS,
     DEFAULT_THRESHOLD,
     HAS_BLAKE3,
-    TEST_PRIME_BITS_FAST,  # Import TEST_PRIME_BITS_FAST
+    TEST_PRIME_BITS_FAST,
     MockField,
-    test_prime_fast,  # Import the fixture
-    test_prime_pq,  # Import the fixture
 )
 
 # --- Test VSSConfig ---
@@ -313,8 +317,54 @@ class TestCyclicGroup:
         with pytest.raises(TypeError):
             group.hash_to_group("not bytes")  # type: ignore
 
+    # Added test for Gap 6
+    def test_enhanced_encode_for_hash(self, default_vss: FeldmanVSS):  # Use default_vss fixture
+        """Test the internal enhanced encoding for hashing."""
+        group = default_vss.group  # Get group from VSS instance
+        # Test different types and contexts
+        enc1 = group._enhanced_encode_for_hash(1, "a", b"b", context="C1")
+        enc2 = group._enhanced_encode_for_hash(1, "a", b"b", context="C2")
+        enc3 = group._enhanced_encode_for_hash("a", 1, b"b", context="C1")  # Different order
+        enc4 = group._enhanced_encode_for_hash(mpz(1), "a", b"b", context="C1")  # mpz vs int
+
+        assert isinstance(enc1, bytes)
+        assert enc1 != enc2  # Context matters
+        assert enc1 != enc3  # Order matters
+        assert enc1 == enc4  # mpz(1) should encode same as int(1)
+
+        # Check structure (presence of type/length prefixes - simplified check)
+        assert b"\x02" in enc1  # Type tag for int
+        assert b"\x01" in enc1  # Type tag for str
+        assert b"\x00" in enc1  # Type tag for bytes
+        assert b"C1" in enc1
+
 
 # --- Test Helper Functions ---
+
+
+# Added test for Gap 1
+def test_estimate_exp_result_size():
+    """Test the estimation of exponentiation result size."""
+    # base_bits, exponent -> expected_bits
+    assert estimate_exp_result_size(10, 3) == 30
+    assert estimate_exp_result_size(10, mpz(3)) == 30
+    # Test large exponent (should be capped by implementation)
+    large_exp = mpz(1) << 40  # Exponent much larger than 2**30
+    # Implementation caps exponent value estimate at 2**30
+    assert estimate_exp_result_size(10, large_exp) == 10 * (2**30)
+    assert estimate_exp_result_size(0, 5) == 0  # Base 0
+    assert estimate_exp_result_size(10, 0) == 0  # Exponent 0
+    assert estimate_exp_result_size(10, 1) == 10  # Exponent 1
+
+
+# Added test for Gap 2
+def test_get_system_memory_fallback(monkeypatch):
+    """Test get_system_memory fallback when psutil is unavailable."""
+    # Simulate psutil not being imported/available
+    monkeypatch.setattr(feldman_vss, "psutil", None)
+    fallback_mem = get_system_memory()
+    # Check if it returns the hardcoded fallback value (1GB)
+    assert fallback_mem == 1 * 1024 * 1024 * 1024
 
 
 @pytest.mark.security
@@ -478,6 +528,23 @@ def test_compute_checksum():
 
     with pytest.raises(TypeError):
         compute_checksum("not bytes")  # type: ignore
+
+
+# Added test for Gap 4
+@pytest.mark.security
+def test_compute_checksum_fallback(monkeypatch):
+    """Test compute_checksum falls back to SHA3-256."""
+    # Simulate blake3 not being available
+    monkeypatch.setattr(feldman_vss, "has_blake3", False)
+    monkeypatch.setattr(feldman_vss, "blake3", None)
+
+    data = b"checksum fallback test"
+    checksum = compute_checksum(data)
+
+    # Calculate expected SHA3-based checksum
+    expected_digest = hashlib.sha3_256(data).digest()[:16]
+    expected_checksum = int.from_bytes(expected_digest, byteorder="big")
+    assert checksum == expected_checksum
 
 
 @pytest.mark.security
@@ -690,12 +757,13 @@ def test_verify_share_invalid_commitments(default_vss: FeldmanVSS, test_shares: 
     # Tamper with one randomizer value
     tampered_commitments_r = copy.deepcopy(test_commitments)
     # Ensure index 1 exists before accessing
-    if len(tampered_commitments_r) > 1:
-        c1, original_r1, e1 = tampered_commitments_r[1]
-        tampered_commitments_r[1] = (c1, (original_r1 + 1) % default_vss.group.prime, e1)  # type: ignore[reportOperatorIssue] # mpz % mpz is valid
-        assert default_vss.verify_share(x, y, tampered_commitments_r) is False
-    else:
+    if len(tampered_commitments_r) <= 1:
         pytest.skip("Skipping randomizer tampering test: not enough commitments.")
+
+    # This code block will only run if the skip condition above is not met
+    c1, original_r1, e1 = tampered_commitments_r[1]
+    tampered_commitments_r[1] = (c1, (original_r1 + 1) % default_vss.group.prime, e1)  # type: ignore[reportOperatorIssue] # mpz % mpz is valid
+    assert default_vss.verify_share(x, y, tampered_commitments_r) is False
 
 
 def test_verify_share_invalid_types(default_vss: FeldmanVSS, test_commitments: CommitmentList):
@@ -863,6 +931,7 @@ def test_vss_method_error_sanitization(mock_field_fast: MockField):
     x_val, y_val = 1, mock_field_fast.random_element()  # Use a valid x, random y
     # Temporarily disable sanitization to see the detailed error for the test setup
     vss.config.sanitize_errors = False
+    detailed_error_text = ""
     try:
         # This should raise VerificationError if sanitization was off
         with pytest.raises(VerificationError) as excinfo_detailed:
@@ -870,8 +939,12 @@ def test_vss_method_error_sanitization(mock_field_fast: MockField):
             serialized = vss.serialize_commitments(commitments)
             vss.verify_share_from_serialized(x_val, (y_val + 1) % vss.field.prime, serialized)  # type: ignore[reportOperatorIssue]
         detailed_error_text = str(excinfo_detailed.value)
+    except Exception as e:
+        pytest.fail(f"Setup for VerificationError test failed: {e}")
     finally:
         vss.config.sanitize_errors = True  # Turn sanitization back on
+
+    assert detailed_error_text, "Failed to capture detailed error message during setup"
 
     # Now test with sanitization on
     with pytest.raises(VerificationError) as excinfo_sanitized:
@@ -881,3 +954,142 @@ def test_vss_method_error_sanitization(mock_field_fast: MockField):
 
     assert detailed_error_text not in sanitized_error_text, "Detailed verification error was exposed"
     assert "Cryptographic verification failed" in sanitized_error_text or "Verification failed" in sanitized_error_text
+
+    # Example 4: Trigger SecurityError during deserialization (e.g., checksum)
+    # Create valid commitments and serialize them
+    coeffs_seq_sec: Sequence[FieldElement] = [mock_field_fast.random_element() for _ in range(DEFAULT_THRESHOLD)]
+    commitments_sec = vss.create_commitments(list(coeffs_seq_sec))
+    valid_serialized = vss.serialize_commitments(commitments_sec)
+
+    # Tamper with the serialized data slightly to cause checksum failure
+    # Ensure tampering doesn't create valid base64 but invalid msgpack
+    tampered_serialized = valid_serialized[:-5] + "XXXXX"  # Simple tampering
+
+    with pytest.raises(SecurityError) as excinfo_security:
+        # Ensure sanitization is on for this check
+        vss.config.sanitize_errors = True
+        try:
+            # Attempt to deserialize tampered data
+            vss.deserialize_commitments(tampered_serialized)
+        except (SerializationError, SecurityError) as e:
+            # We expect SecurityError due to checksum, but catch SerializationError too
+            if isinstance(e, SecurityError):
+                raise  # Re-raise the expected SecurityError
+            else:
+                # If it's a SerializationError instead, fail the test setup
+                pytest.fail(f"Expected SecurityError due to tampering, but got SerializationError: {e}")
+        except Exception as e:
+            pytest.fail(f"Unexpected error during tampered deserialization: {e}")
+
+    # Check if the message is sanitized
+    # The detailed message would likely contain "Checksum mismatch" or similar
+    detailed_checksum_message = "Checksum mismatch"  # Example detail
+    expected_sanitized_checksum_message = "Data integrity check failed"  # From sanitize_error logic
+    assert detailed_checksum_message not in str(excinfo_security.value), "Detailed checksum error message was exposed"
+    assert expected_sanitized_checksum_message in str(excinfo_security.value), "Sanitized checksum message not found"
+
+
+# --- Added Tests for Gaps ---
+
+
+# Test for Gap 3: MemoryMonitor Class
+class TestMemoryMonitor:
+    def test_monitor_init_and_stats(self):
+        monitor = MemoryMonitor(max_memory_mb=512)
+        assert monitor.max_memory_mb == 512
+        stats = monitor.get_usage_stats()
+        assert stats["current_bytes"] == 0
+        assert stats["peak_bytes"] == 0
+        assert stats["max_mb"] == 512
+
+    def test_monitor_allocate_release(self):
+        monitor = MemoryMonitor(max_memory_mb=10)  # 10MB
+        size1 = 5 * 1024 * 1024
+        size2 = 3 * 1024 * 1024
+        assert monitor.check_allocation(size1) is True
+        assert monitor.allocate(size1) is True
+        assert monitor.current_usage == size1
+        assert monitor.peak_usage == size1
+        assert monitor.allocate(size2) is True
+        assert monitor.current_usage == size1 + size2
+        assert monitor.peak_usage == size1 + size2
+        monitor.release(size1)
+        assert monitor.current_usage == size2
+        assert monitor.peak_usage == size1 + size2  # Peak doesn't decrease
+
+    def test_monitor_errors(self):
+        monitor = MemoryMonitor(max_memory_mb=1)  # 1MB
+        size_ok = 512 * 1024
+        size_too_big = 600 * 1024
+        monitor.allocate(size_ok)
+        # Check allocation fails
+        assert monitor.check_allocation(size_too_big) is False
+        # Allocate fails
+        with pytest.raises(MemoryError):
+            monitor.allocate(size_too_big)
+        # Release too much fails
+        with pytest.raises(ValueError, match="Cannot release more memory"):
+            monitor.release(size_ok + 1)
+        # Release negative fails
+        with pytest.raises(ValueError, match="cannot be negative"):
+            monitor.release(-100)
+        # Release wrong type fails
+        with pytest.raises(TypeError):
+            monitor.release("abc")  # type: ignore
+
+
+# Test for Gap 5: SafeLRUCache Class
+class TestSafeLRUCache:
+    def test_cache_eviction(self):
+        cache: SafeLRUCache[str, str] = SafeLRUCache(capacity=2)
+        cache.put("key1", "val1")
+        cache.put("key2", "val2")
+        assert cache.get("key1") == "val1"
+        cache.put("key3", "val3")  # Should evict key2 (oldest access was key1)
+        assert cache.get("key2") is None
+        assert cache.get("key1") == "val1"
+        assert cache.get("key3") == "val3"
+        assert len(cache) == 2
+
+    def test_cache_get_reorders(self):
+        cache: SafeLRUCache[str, str] = SafeLRUCache(capacity=2)
+        cache.put("key1", "val1")
+        cache.put("key2", "val2")
+        _ = cache.get("key1")  # Access key1, making key2 LRU
+        cache.put("key3", "val3")  # Should evict key2
+        assert cache.get("key2") is None
+        assert cache.get("key1") == "val1"
+        assert cache.get("key3") == "val3"
+
+    def test_cache_clear(self):
+        cache: SafeLRUCache[str, str] = SafeLRUCache(capacity=2)
+        cache.put("key1", "val1")
+        cache.clear()
+        assert len(cache) == 0
+        assert cache.get("key1") is None
+
+
+# Test for Gap 7: FeldmanVSS Internal Helpers
+def test_feldman_internal_helpers(default_vss: FeldmanVSS):
+    """Unit test internal VSS helper methods."""
+    coeffs: list[FieldElement] = [mpz(10), mpz(5), mpz(2)]  # 10 + 5x + 2x^2
+    randomizers: list[FieldElement] = [mpz(3), mpz(7), mpz(1)]  # r0, r1, r2
+    # (Value, Randomizer, Entropy)
+    commits: CommitmentList = [(mpz(100), mpz(3), None), (mpz(200), mpz(7), None), (mpz(300), mpz(1), None)]
+    prime = default_vss.field.prime
+
+    # _evaluate_polynomial
+    assert default_vss._evaluate_polynomial(coeffs, 2) == 28 % prime
+
+    # _compute_combined_randomizer
+    # x=2 -> r0 + r1*2 + r2*2^2 = 3 + 7*2 + 1*4 = 21
+    assert default_vss._compute_combined_randomizer(randomizers, 2) == 21 % prime
+
+    # _compute_expected_commitment
+    # x=2 -> C0 + C1*2 + C2*2^2 = 100 + 200*2 + 300*4 = 1700
+    # Extract only the commitment values (first element of each tuple)
+    commit_values: list[FieldElement] = [c[0] for c in commits]
+    # Cast the list[FieldElement] to the type expected by the function signature to satisfy Pylance/Pyright due to list invariance.
+    # The function's internal logic correctly handles processing a list containing only FieldElements.
+    commitments_for_func = cast(list[Union[tuple[FieldElement, ...], FieldElement]], commit_values)
+    assert default_vss._compute_expected_commitment(commitments_for_func, 2) == 1700 % prime
