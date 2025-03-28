@@ -176,14 +176,14 @@ jobs:
 
       - name: Initialize CodeQL
         if: matrix.tool == 'codeql'
-        uses: github/codeql-action/init@9bd18b486fd4e8174d935b2c781f53e02afb1eb6 # Pin to v3 or similar
+        uses: github/codeql-action/init@9f45e7498becbbc08084a122b4be9ab534ac6d88 # Pin to v3 or similar
         with:
           languages: python
           # Add queries if needed: queries: +security-extended,etc.
 
       - name: Perform CodeQL Analysis
         if: matrix.tool == 'codeql'
-        uses: github/codeql-action/analyze@9bd18b486fd4e8174d935b2c781f53e02afb1eb6 # Pin to v3 or similar
+        uses: github/codeql-action/analyze@9f45e7498becbbc08084a122b4be9ab534ac6d88 # Pin to v3 or similar
         with:
           # Output path is handled by the action, will be in 'codeql_results/python.sarif' typically
           # Let's use the default and find it later
