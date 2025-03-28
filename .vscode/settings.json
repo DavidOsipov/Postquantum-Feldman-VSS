@@ -1,5 +1,4 @@
 {
-    "python.analysis.typeCheckingMode": "strict",
     "python.analysis.autoImportCompletions": true,
     "snyk.trustedFolders": [
         "C:\\Users\\Sina\\Documents\\PostQuantum-Feldman-VSS\\PostQuantum-Feldman-VSS",
@@ -9,13 +8,14 @@
         "${workspaceFolder}/.devcontainer/requirements.txt"
     ],
     "snyk.folderConfigs": [],
-    "python.testing.pytestArgs": [
-        "tests"
-    ],
-    "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
     "sonarlint.connectedMode.project": {
         "connectionId": "davidosipov",
         "projectKey": "DavidOsipov_PostQuantum-Feldman-VSS"
     },
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
 }

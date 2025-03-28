@@ -139,11 +139,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install hatch
+        pip install poetry
     
     - name: Build a binary wheel and a source tarball
       run: |
-        hatch build
+        poetry build
 
     - name: Publish distribution 📦 to PyPI
       if: startsWith(github.ref, 'refs/tags/v')
