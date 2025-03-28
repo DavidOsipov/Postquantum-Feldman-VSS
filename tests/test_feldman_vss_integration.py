@@ -30,7 +30,7 @@ from feldman_vss import (
     verify_dual_commitments,
 )
 
-from .test_conftest import (
+from .conftest import (
     DEFAULT_NUM_SHARES,
     DEFAULT_THRESHOLD,
     HAS_BLAKE3,

@@ -2,13 +2,13 @@
 # Tests for error handling, edge cases, and robustness of the Feldman VSS implementation.
 
 import copy
-import logging  # Added import
-import random  # Added import
+import logging
+import random
 import secrets
 import time
 import warnings
 from base64 import urlsafe_b64decode, urlsafe_b64encode
-from collections.abc import Sequence  # Fixed: Removed List, kept Sequence
+from collections.abc import Sequence
 from unittest.mock import patch
 
 import msgpack
@@ -17,7 +17,7 @@ from gmpy2 import mpz
 
 # Import necessary components from the main module and conftest
 from feldman_vss import (
-    MAX_TIME_DRIFT,  # Added import
+    MAX_TIME_DRIFT,
     MIN_PRIME_BITS,
     VSS_VERSION,
     CommitmentList,
@@ -37,7 +37,7 @@ from feldman_vss import (
 )
 
 # Import shared fixtures and helpers from conftest
-from .test_conftest import (
+from .conftest import (
     DEFAULT_NUM_SHARES,
     DEFAULT_THRESHOLD,
     HAS_PSUTIL,

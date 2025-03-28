@@ -11,7 +11,6 @@ from unittest import mock
 
 import gmpy2
 import pytest
-from test_conftest import generate_poly_and_shares
 
 # Assuming feldman_vss is importable (handled in conftest or project structure)
 import feldman_vss as fvss
@@ -28,10 +27,11 @@ from feldman_vss import (
     VerificationError,
     VSSConfig,
 )
+from tests.conftest import generate_poly_and_shares
 
 # Import helper from conftest if needed, or define necessary mocks/helpers locally
 # Assuming get_prime is available from conftest or similar setup
-from .test_conftest import (
+from .conftest import (
     DEFAULT_NUM_SHARES,
     DEFAULT_THRESHOLD,
     MockField,

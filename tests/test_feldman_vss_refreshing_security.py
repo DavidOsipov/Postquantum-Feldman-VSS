@@ -21,7 +21,7 @@ from feldman_vss import (
 )
 
 # Import fixtures and helpers from conftest
-from .test_conftest import (
+from .conftest import (
     DEFAULT_NUM_SHARES,
     DEFAULT_THRESHOLD,
     MockField,

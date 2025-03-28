@@ -45,7 +45,7 @@ from feldman_vss import (
     secure_redundant_execution,
     validate_timestamp,
 )
-from tests.test_conftest import (
+from tests.conftest import (
     DEFAULT_PRIME_BITS,
     DEFAULT_THRESHOLD,
     HAS_BLAKE3,

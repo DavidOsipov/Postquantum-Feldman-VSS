@@ -19,7 +19,7 @@ from feldman_vss import (
     SharePoint,
 )
 
-from .test_conftest import (
+from .conftest import (
     HAS_PSUTIL,
     LARGE_N,
     LARGE_T,

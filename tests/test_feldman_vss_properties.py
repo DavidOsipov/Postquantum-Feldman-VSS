@@ -29,7 +29,7 @@ from feldman_vss import (
     VerificationError,
 )
 
-from .test_conftest import (
+from .conftest import (
     TEST_PRIME_BITS_FAST,
     MockField,
     MockShamirSecretSharing,  # INFO: Only used in test_prop_refresh_preserves_secret
